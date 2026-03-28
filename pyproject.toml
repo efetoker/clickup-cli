@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "clickup-cli"
+dynamic = ["version"]
+description = "The missing ClickUp CLI. Built for developers and AI agents."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [
+    { name = "Efe Toker" },
+]
+keywords = ["clickup", "cli", "api", "ai-agent", "task-management"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = [
+    "requests>=2.20",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+clickup = "clickup_cli.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/efetoker/clickup-cli"
+Repository = "https://github.com/efetoker/clickup-cli"
+Issues = "https://github.com/efetoker/clickup-cli/issues"
+
+[tool.hatch.version]
+path = "src/clickup_cli/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/clickup_cli"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
