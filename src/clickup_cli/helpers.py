@@ -37,6 +37,10 @@ def resolve_space_id(space_arg):
 
     if space_arg in SPACES:
         return SPACES[space_arg]["space_id"]
+    # If it's not numeric, it's likely a misspelled config name
+    if not space_arg.isdigit():
+        available = ", ".join(sorted(SPACES.keys())) if SPACES else "(none configured)"
+        error(f"Unknown space: {space_arg}. Available: {available}")
     return space_arg
 
 
@@ -45,7 +49,8 @@ def fetch_all_comments(client, task_id):
     resp = client.get_v2(f"/task/{task_id}/comment")
     comments = resp.get("comments", [])
     all_comments = list(comments)
-    while len(comments) >= 25:
+    page_size = len(comments)
+    while page_size > 0 and len(comments) >= page_size:
         last = comments[-1]
         params = {"start": str(last["date"]), "start_id": last["id"]}
         resp = client.get_v2(f"/task/{task_id}/comment", params=params)

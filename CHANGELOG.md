@@ -5,7 +5,9 @@
 - Auto-detect workspace ID for single-workspace accounts — no need to set it manually
 - Fix user detection in `clickup init` — now prompts for selection in multi-member workspaces
 - workspace_id is saved back to config file after auto-detection
-- Update docs and skill file to reflect new auto-detection behavior
+- Add `--debug` flag — logs API requests and responses to stderr for troubleshooting
+- Improve space name resolution — clear error with available names when a space isn't found in config
+- Fix comment pagination — no longer hardcodes page size assumption
 
 ## 1.0.0 (2026-03-28)
 

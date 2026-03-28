@@ -1,5 +1,6 @@
-"""ClickUp API client with rate limiting and dry-run support."""
+"""ClickUp API client with rate limiting, dry-run, and debug support."""
 
+import json as _json
 import sys
 import time
 
@@ -12,9 +13,10 @@ class ClickUpClient:
     BASE_V2 = "https://api.clickup.com/api/v2"
     BASE_V3 = "https://api.clickup.com/api/v3"
 
-    def __init__(self, token, dry_run=False):
+    def __init__(self, token, dry_run=False, debug=False):
         self.token = token
         self.dry_run = dry_run
+        self.debug = debug
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -22,6 +24,11 @@ class ClickUpClient:
                 "Content-Type": "application/json",
             }
         )
+
+    def _log(self, msg):
+        """Print debug message to stderr."""
+        if self.debug:
+            print(f"[debug] {msg}", file=sys.stderr)
 
     def _check_rate_limit(self, response):
         """Sleep proactively if rate limit is running low."""
@@ -40,6 +47,12 @@ class ClickUpClient:
         if self.dry_run and not allow_dry_run:
             return {"dry_run": True, "method": method, "url": url, "kwargs": kwargs}
 
+        self._log(f"{method} {url}")
+        if kwargs.get("params"):
+            self._log(f"  params: {kwargs['params']}")
+        if kwargs.get("json"):
+            self._log(f"  body: {_json.dumps(kwargs['json'], ensure_ascii=False)}")
+
         resp = None
         try:
             resp = self.session.request(method, url, **kwargs)
@@ -50,6 +63,7 @@ class ClickUpClient:
             error("No response received from ClickUp API")
 
         response = resp
+        self._log(f"  → {response.status_code} ({len(response.text)} bytes)")
 
         if response.status_code == 429:
             reset = response.headers.get("X-RateLimit-Reset")

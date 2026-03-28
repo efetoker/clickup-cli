@@ -76,6 +76,7 @@ Use `clickup <group> <command> --help` for detailed usage, examples, and return 
 ```
 --pretty     Pretty-print JSON output
 --dry-run    Preview mutations without executing
+--debug      Log API requests and responses to stderr
 --version    Show version
 ```
 

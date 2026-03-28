@@ -8,7 +8,7 @@ from .client import ClickUpClient
 from .helpers import output, error
 
 
-GLOBAL_FLAGS = {"--pretty", "--dry-run"}
+GLOBAL_FLAGS = {"--pretty", "--dry-run", "--debug"}
 
 
 def normalize_cli_argv(argv):
@@ -43,7 +43,7 @@ Global flags can appear before or after the command group:
   clickup --pretty tasks list --space <name>
   clickup tasks list --space <name> --pretty
   clickup --dry-run tasks create --space <name> --name "My task"
-  clickup tasks create --space <name> --name "My task" --dry-run""",
+  clickup --debug tasks list --space <name>""",
         epilog="""\
 examples:
   clickup init                              # set up config
@@ -76,6 +76,11 @@ Use <group> --help for details on each group.""",
         "--dry-run",
         action="store_true",
         help="Preview the API request without executing it (safe for mutations)",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Log API requests and responses to stderr for troubleshooting",
     )
     parser.add_argument(
         "--version",
@@ -1693,7 +1698,7 @@ def main():
             "No API token found. Set CLICKUP_API_TOKEN or run: clickup init"
         )
 
-    client = ClickUpClient(token, dry_run=args.dry_run)
+    client = ClickUpClient(token, dry_run=args.dry_run, debug=args.debug)
     result = dispatch(client, args)
 
     if result is not None:
