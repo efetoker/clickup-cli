@@ -444,7 +444,7 @@ class EntrypointTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(result.returncode, 0)
-        self.assertIn("1.0.0", result.stdout)
+        self.assertIn("1.1.0", result.stdout)
 
 
 class ConfigFallbackTests(unittest.TestCase):
@@ -456,24 +456,36 @@ class ConfigFallbackTests(unittest.TestCase):
         from clickup_cli import config
         self.assertIsNone(config._config_cache)
 
-    def test_config_env_only_without_workspace_id_exits(self):
-        from clickup_cli.config import _reset
+    def test_config_auto_detects_workspace_when_missing(self):
+        """When config has token but no workspace_id, auto-detect fills it in."""
+        import json
+        import tempfile
+        from clickup_cli.config import _reset, load_config
         _reset()
 
-        with patch.dict(os.environ, {"CLICKUP_API_TOKEN": "pk_test"}, clear=False):
-            # Remove CLICKUP_WORKSPACE_ID if set
-            env = os.environ.copy()
-            env.pop("CLICKUP_WORKSPACE_ID", None)
-            env.pop("CLICKUP_CONFIG_PATH", None)
-            result = subprocess.run(
-                [sys.executable, "-c",
-                 "from clickup_cli.config import load_config; load_config()"],
-                capture_output=True,
-                text=True,
-                env=env,
-                cwd="/tmp",  # avoid picking up local config
-            )
-            self.assertNotEqual(result.returncode, 0)
+        # Create temp config with only api_token, no workspace_id
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as f:
+            json.dump({"api_token": "pk_test"}, f)
+            tmp_path = f.name
+
+        try:
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_resp.ok = True
+            mock_resp.json.return_value = {
+                "teams": [{"id": "12345", "name": "Test Workspace"}]
+            }
+
+            with patch.dict(os.environ, {"CLICKUP_CONFIG_PATH": tmp_path}):
+                with patch("requests.get", return_value=mock_resp):
+                    config = load_config()
+
+            self.assertEqual(config["workspace_id"], "12345")
+        finally:
+            os.unlink(tmp_path)
+            _reset()
 
 
 class PreCreateDedupTests(unittest.TestCase):

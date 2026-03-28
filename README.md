@@ -16,7 +16,9 @@ pip install clickup-cli
 clickup init
 ```
 
-This prompts for your API token, discovers your workspaces and spaces, and writes a config file to `~/.config/clickup-cli/config.json`.
+This prompts for your API token, discovers your workspaces and spaces, identifies your user, and writes a config file to `~/.config/clickup-cli/config.json`.
+
+If you have a single workspace, it's selected automatically. Same for user detection in single-member workspaces.
 
 Get your API token at [app.clickup.com/settings/apps](https://app.clickup.com/settings/apps).
 
@@ -125,11 +127,11 @@ clickup tasks list --space myspace --pretty
 | Variable | Purpose |
 |----------|---------|
 | `CLICKUP_API_TOKEN` | API token (overrides config file token) |
-| `CLICKUP_WORKSPACE_ID` | Workspace ID (required if no config file) |
+| `CLICKUP_WORKSPACE_ID` | Workspace ID (auto-detected if you have one workspace) |
 | `CLICKUP_USER_ID` | User ID for task assignment |
 | `CLICKUP_CONFIG_PATH` | Custom config file path |
 
-You can run without a config file entirely by setting `CLICKUP_API_TOKEN` and `CLICKUP_WORKSPACE_ID`.
+You can run without a config file by setting just `CLICKUP_API_TOKEN` — the workspace ID is auto-detected if your account has a single workspace. Set `CLICKUP_WORKSPACE_ID` explicitly for multi-workspace accounts.
 
 ## Coverage and Gaps
 

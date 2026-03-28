@@ -80,7 +80,7 @@ The CLI loads config from (in order):
 
 Or use environment variables only:
 - `CLICKUP_API_TOKEN` (required)
-- `CLICKUP_WORKSPACE_ID` (required without config file)
+- `CLICKUP_WORKSPACE_ID` (auto-detected for single-workspace accounts)
 
 Run `clickup init` for interactive setup.
 

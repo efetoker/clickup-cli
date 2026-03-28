@@ -50,7 +50,6 @@ class ClickUpClient:
             error("No response received from ClickUp API")
 
         response = resp
-        assert response is not None
 
         if response.status_code == 429:
             reset = response.headers.get("X-RateLimit-Reset")

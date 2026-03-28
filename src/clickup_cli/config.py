@@ -5,6 +5,8 @@ Config resolution order:
 2. ~/.config/clickup-cli/config.json → XDG-ish default
 3. clickup-config.json in current working directory → project-local override
 4. Environment variables only (CLICKUP_API_TOKEN + CLICKUP_WORKSPACE_ID)
+
+workspace_id is auto-detected from the API when missing (single-workspace accounts).
 """
 
 import json
@@ -12,6 +14,69 @@ import os
 import sys
 
 _config_cache = None
+
+
+def _auto_detect_workspace(token):
+    """Auto-detect workspace ID when only a token is available.
+
+    Returns workspace_id string. Exits with error if detection fails.
+    """
+    import requests
+
+    print("Auto-detecting workspace...", file=sys.stderr)
+    headers = {"Authorization": token, "Content-Type": "application/json"}
+
+    try:
+        resp = requests.get(
+            "https://api.clickup.com/api/v2/team", headers=headers, timeout=15
+        )
+    except requests.ConnectionError:
+        print("Error: Could not reach ClickUp API to auto-detect workspace", file=sys.stderr)
+        sys.exit(1)
+
+    if resp.status_code == 401:
+        print("Error: Authentication failed — check your API token", file=sys.stderr)
+        sys.exit(1)
+
+    if not resp.ok:
+        print(f"Error: API error {resp.status_code} while detecting workspace: {resp.text}", file=sys.stderr)
+        sys.exit(1)
+
+    teams = resp.json().get("teams", [])
+
+    if not teams:
+        print("Error: No workspaces found for this token", file=sys.stderr)
+        sys.exit(1)
+
+    if len(teams) == 1:
+        workspace_id = str(teams[0]["id"])
+        print(
+            f"Found workspace: {teams[0]['name']} (ID: {workspace_id})",
+            file=sys.stderr,
+        )
+        return workspace_id
+
+    # Multiple workspaces — can't auto-select
+    lines = ["Error: Multiple workspaces found — set workspace_id manually:"]
+    for t in teams:
+        lines.append(f"  {t['name']}: {t['id']}")
+    lines.append("\nSet it in your config file or via: export CLICKUP_WORKSPACE_ID=<id>")
+    print("\n".join(lines), file=sys.stderr)
+    sys.exit(1)
+
+
+def _save_field_to_config(path, field, value):
+    """Update a single field in an existing config file."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        config[field] = value
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        print(f"Saved {field} to {path}", file=sys.stderr)
+    except (OSError, json.JSONDecodeError):
+        pass  # Non-critical — config works in memory even if save fails
 
 
 def _find_config_path():
@@ -54,18 +119,18 @@ def _load_from_file(path):
     if env_token:
         config["api_token"] = env_token
 
-    # Validate required fields
-    missing = []
-    for field in ("api_token", "workspace_id"):
-        if not config.get(field):
-            missing.append(field)
-    if missing:
+    if not config.get("api_token"):
         print(
-            f"Error: Missing required fields in {path}: {', '.join(missing)}\n"
+            f"Error: Missing required field in {path}: api_token\n"
             "See clickup-config.example.json for the expected schema.",
             file=sys.stderr,
         )
         sys.exit(1)
+
+    # Auto-detect workspace_id if missing
+    if not config.get("workspace_id"):
+        config["workspace_id"] = _auto_detect_workspace(config["api_token"])
+        _save_field_to_config(path, "workspace_id", config["workspace_id"])
 
     return config
 
@@ -73,18 +138,12 @@ def _load_from_file(path):
 def _load_from_env():
     """Build minimal config from environment variables only."""
     token = os.environ.get("CLICKUP_API_TOKEN")
-    workspace_id = os.environ.get("CLICKUP_WORKSPACE_ID")
-
     if not token:
         return None
 
+    workspace_id = os.environ.get("CLICKUP_WORKSPACE_ID")
     if not workspace_id:
-        print(
-            "Error: CLICKUP_API_TOKEN is set but CLICKUP_WORKSPACE_ID is missing.\n"
-            "Either set CLICKUP_WORKSPACE_ID or run: clickup init",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        workspace_id = _auto_detect_workspace(token)
 
     return {
         "api_token": token,

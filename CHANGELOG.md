@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0 (2026-03-29)
+
+- Auto-detect workspace ID for single-workspace accounts — no need to set it manually
+- Fix user detection in `clickup init` — now prompts for selection in multi-member workspaces
+- workspace_id is saved back to config file after auto-detection
+- Update docs and skill file to reflect new auto-detection behavior
+
 ## 1.0.0 (2026-03-28)
 
 Initial public release.

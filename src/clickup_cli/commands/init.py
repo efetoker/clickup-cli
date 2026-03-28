@@ -72,15 +72,29 @@ def cmd_init(args):
     # Find authenticated user
     user_id = ""
     members = team.get("members", [])
-    for m in members:
-        u = m.get("user", {})
-        if u.get("role_key") in ("owner", "admin", "member"):
-            # Use the first member's ID as the user (best guess)
-            # The token owner is usually the one making the request
-            pass
-    # ClickUp doesn't directly tell us who the token belongs to via /team,
-    # but the first member with the matching invite is usually the owner.
-    # For now, leave user_id empty — it can be set manually if needed.
+    if len(members) == 1:
+        u = members[0].get("user", {})
+        user_id = str(u.get("id", ""))
+        print(f"Found user: {u.get('username', 'unknown')} (ID: {user_id})", file=sys.stderr)
+    elif members:
+        print(f"\nFound {len(members)} members:", file=sys.stderr)
+        for i, m in enumerate(members, 1):
+            u = m.get("user", {})
+            print(
+                f"  {i}. {u.get('username', 'unknown')} — {u.get('email', '')} (ID: {u.get('id')})",
+                file=sys.stderr,
+            )
+        try:
+            choice = input(f"Which one is you? [1-{len(members)}] (Enter to skip): ").strip()
+            if choice:
+                idx = int(choice) - 1
+                if 0 <= idx < len(members):
+                    u = members[idx].get("user", {})
+                    user_id = str(u.get("id", ""))
+                else:
+                    raise ValueError
+        except (ValueError, EOFError, KeyboardInterrupt):
+            print("Skipped — set user_id in config later if needed.", file=sys.stderr)
 
     # Fetch spaces
     print("Fetching spaces...", file=sys.stderr)
