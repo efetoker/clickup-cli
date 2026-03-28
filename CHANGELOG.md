@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.2 (2026-03-29)
+
+- Add auto-lint hook — ruff check/format runs automatically on every Python file edit
+- Add sensitive file guard — blocks edits to `.env`, `.secret`, `.pem`, `.key`, and credentials files
+- Add context7 MCP server (`.mcp.json`) — live ClickUp API docs for contributors
+- Add `test-writer` subagent (`.claude/agents/`) — generates pytest tests following project patterns
+- Add `/release` skill — version bump, validate, tag, build, publish workflow
+- Clean up permission allowlist in `.claude/settings.local.json`
+
 ## 1.1.1 (2026-03-29)
 
 - Add `.env` and `.env.*` to `.gitignore` for API token safety

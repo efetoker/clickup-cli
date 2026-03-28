@@ -140,6 +140,18 @@ You can run without a config file by setting just `CLICKUP_API_TOKEN` — the wo
 
 **Not yet covered:** checklists, time tracking, custom fields, task relationships, attachments, goals, webhooks, automations.
 
+## Development Tools
+
+This repo includes automations for contributors using [Claude Code](https://claude.com/claude-code):
+
+- **Auto-lint hook** — ruff check + format runs on every Python file edit
+- **Sensitive file guard** — blocks accidental edits to `.env`, `.key`, `.pem`, and credentials files
+- **context7 MCP** — live ClickUp API docs available during development (via `.mcp.json`)
+- **Skills** — `/release` workflow, `add-command` step-by-step guide, `clickup-cli` usage reference
+- **Subagents** — `test-writer` generates pytest tests following project patterns
+
+These are configured in `.claude/` and `.mcp.json`. Non-Claude-Code contributors can ignore them.
+
 ## Contributing
 
 ```bash

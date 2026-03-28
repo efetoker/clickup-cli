@@ -30,3 +30,7 @@ clickup-config.json
 
 # Workflow artifacts
 .planning/
+.audit/
+
+# Local-only Claude Code settings (permissions, etc.)
+.claude/settings.local.json
