@@ -25,7 +25,7 @@ Before any mutating command (create, update, delete), use `--dry-run`:
 clickup --dry-run tasks create --space myspace --name "New task"
 ```
 
-Global flags (`--pretty`, `--dry-run`) can appear before or after the command group.
+Global flags (`--pretty`, `--dry-run`, `--debug`) can appear before or after the command group.
 
 ## Output
 

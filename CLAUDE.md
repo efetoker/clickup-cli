@@ -9,7 +9,7 @@ A ClickUp CLI for developers and AI agents. JSON-only stdout, errors to stderr, 
 ```
 src/clickup_cli/
 ├── cli.py           # argparse parser + dispatch + main()
-├── client.py        # ClickUpClient API wrapper (rate limiting, dry-run)
+├── client.py        # ClickUpClient API wrapper (rate limiting, dry-run, debug)
 ├── config.py        # Config loader (lazy, fallback chain, workspace auto-detect)
 ├── helpers.py       # output(), error(), compact_task(), etc.
 └── commands/
