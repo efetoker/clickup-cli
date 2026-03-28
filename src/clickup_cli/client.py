@@ -53,16 +53,11 @@ class ClickUpClient:
         if kwargs.get("json"):
             self._log(f"  body: {_json.dumps(kwargs['json'], ensure_ascii=False)}")
 
-        resp = None
         try:
-            resp = self.session.request(method, url, **kwargs)
+            response = self.session.request(method, url, **kwargs)
         except requests.ConnectionError:
             error("Couldn't reach ClickUp API — check your network connection")
 
-        if resp is None:
-            error("No response received from ClickUp API")
-
-        response = resp
         self._log(f"  → {response.status_code} ({len(response.text)} bytes)")
 
         if response.status_code == 429:
@@ -75,8 +70,6 @@ class ClickUpClient:
                     response = self.session.request(method, url, **kwargs)
                 except requests.ConnectionError:
                     error("Couldn't reach ClickUp API — check your network connection")
-                if response is None:
-                    error("No response received from ClickUp API")
 
         if response.status_code == 401:
             error(

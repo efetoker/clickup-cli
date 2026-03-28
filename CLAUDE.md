@@ -8,22 +8,24 @@ A ClickUp CLI for developers and AI agents. JSON-only stdout, errors to stderr, 
 
 ```
 src/clickup_cli/
-├── cli.py           # argparse parser + dispatch + main()
+├── cli.py           # root parser, dispatch, main() — delegates to command modules
 ├── client.py        # ClickUpClient API wrapper (rate limiting, dry-run, debug)
 ├── config.py        # Config loader (lazy, fallback chain, workspace auto-detect)
 ├── helpers.py       # output(), error(), compact_task(), etc.
 └── commands/
     ├── __init__.py  # HANDLERS dict
-    ├── tasks.py     # tasks CRUD + search/move/merge
-    ├── comments.py  # comments CRUD + threading
-    ├── docs.py      # docs + pages CRUD
-    ├── folders.py   # folders CRUD
-    ├── lists.py     # lists CRUD
-    ├── spaces.py    # spaces read-only
-    ├── tags.py      # tags add/remove
-    ├── team.py      # whoami, members
+    ├── tasks.py     # tasks parser + handlers (list/get/create/update/search/delete/move/merge)
+    ├── comments.py  # comments parser + handlers (list/add/update/delete/thread/reply)
+    ├── docs.py      # docs parser + handlers (list/get/create/pages/get-page/edit-page/create-page)
+    ├── folders.py   # folders parser + handlers (list/get/create/update/delete)
+    ├── lists.py     # lists parser + handlers (list/get/create/update/delete)
+    ├── spaces.py    # spaces parser + handlers (list/get/statuses)
+    ├── tags.py      # tags parser + handlers (list/add/remove)
+    ├── team.py      # team parser + handlers (whoami/members)
     └── init.py      # clickup init setup command
 ```
+
+Each command module owns both its argparse parser definition (`register_parser()`) and its handler functions. `cli.py` builds the root parser and delegates to each module's `register_parser(subparsers, F)`.
 
 ## Development Setup
 
@@ -36,12 +38,13 @@ ruff check src/ tests/
 ## Adding a New Command
 
 1. Create or extend a file in `src/clickup_cli/commands/`
-2. Add detailed `--help` text (description + epilog with examples)
+2. Add the handler function and `register_parser()` in the same module
 3. Register the handler in `commands/__init__.py` HANDLERS dict
-4. Add the subparser in `cli.py` under the appropriate group
-5. Mutating commands must support `--dry-run`
-6. All output goes to stdout as JSON, errors to stderr
-7. Add tests in `tests/`
+4. If it's a new command group, call `register_parser()` from `cli.py`'s `build_parser()`
+5. Add detailed `--help` text (description + epilog with examples)
+6. Mutating commands must support `--dry-run`
+7. All output goes to stdout as JSON, errors to stderr
+8. Add tests in `tests/`
 
 ## Rules
 

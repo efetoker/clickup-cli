@@ -3,6 +3,67 @@
 from ..config import WORKSPACE_ID
 
 
+def register_parser(subparsers, F):
+    """Register all team subcommands on the given subparsers object."""
+    team_parser = subparsers.add_parser(
+        "team",
+        formatter_class=F,
+        help="Workspace and team member information",
+        description="""\
+Inspect workspace and team details — authenticated user info and member list.
+
+Subcommands:
+  whoami   — show workspace info and authenticated user context
+  members  — list all members of the workspace
+
+All commands are read-only.""",
+        epilog="""\
+examples:
+  clickup team whoami
+  clickup team members
+  clickup --pretty team whoami""",
+    )
+    team_sub = team_parser.add_subparsers(dest="command", required=True)
+
+    # team whoami
+    team_sub.add_parser(
+        "whoami",
+        formatter_class=F,
+        help="Show workspace info and member context",
+        description="""\
+Show the workspace name, ID, and all members visible to the authenticated
+user. Use this as a quick sanity check to confirm which workspace and
+identity the CLI is operating under.""",
+        epilog="""\
+returns:
+  {"workspace": {"id": ..., "name": ...}, "members": [...], "member_count": N}
+
+examples:
+  clickup team whoami
+  clickup --pretty team whoami""",
+    )
+
+    # team members
+    team_sub.add_parser(
+        "members",
+        formatter_class=F,
+        help="List all workspace members",
+        description="""\
+List all members of the workspace with their IDs, usernames, emails,
+and roles. Use this to discover user IDs for task assignment or to
+verify team membership.""",
+        epilog="""\
+returns:
+  {"members": [...], "count": N}
+
+  Each member has: id, username, email, role, initials.
+
+examples:
+  clickup team members
+  clickup --pretty team members""",
+    )
+
+
 def _get_workspace(client):
     """Fetch teams and find the configured workspace."""
     resp = client.get_v2("/team")

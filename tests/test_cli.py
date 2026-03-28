@@ -425,6 +425,382 @@ class HelperTests(unittest.TestCase):
         self.assertEqual(result[0]["status"], "open")
 
 
+class ParserComprehensiveTests(unittest.TestCase):
+    """Parser tests for every command group — safety net for build_parser() refactor."""
+
+    def setUp(self):
+        self.parser = cli.build_parser()
+
+    def _parse(self, argv):
+        return self.parser.parse_args(cli.normalize_cli_argv(argv))
+
+    # --- comments ---
+
+    def test_comments_list(self):
+        args = self._parse(["comments", "list", "task1"])
+        self.assertEqual(args.group, "comments")
+        self.assertEqual(args.command, "list")
+        self.assertEqual(args.task_id, "task1")
+
+    def test_comments_add(self):
+        args = self._parse(["comments", "add", "task1", "--text", "hello"])
+        self.assertEqual(args.command, "add")
+        self.assertEqual(args.text, "hello")
+
+    def test_comments_update(self):
+        args = self._parse(["comments", "update", "c1", "--text", "fixed"])
+        self.assertEqual(args.command, "update")
+        self.assertEqual(args.comment_id, "c1")
+
+    def test_comments_update_resolve(self):
+        args = self._parse(["comments", "update", "c1", "--resolve"])
+        self.assertTrue(args.resolved)
+
+    def test_comments_update_unresolve(self):
+        args = self._parse(["comments", "update", "c1", "--unresolve"])
+        self.assertFalse(args.resolved)
+
+    def test_comments_delete(self):
+        args = self._parse(["comments", "delete", "c1"])
+        self.assertEqual(args.command, "delete")
+        self.assertEqual(args.comment_id, "c1")
+
+    def test_comments_thread(self):
+        args = self._parse(["comments", "thread", "c1"])
+        self.assertEqual(args.command, "thread")
+        self.assertEqual(args.comment_id, "c1")
+
+    def test_comments_reply(self):
+        args = self._parse(["comments", "reply", "c1", "--text", "ok"])
+        self.assertEqual(args.command, "reply")
+        self.assertEqual(args.text, "ok")
+
+    # --- docs ---
+
+    def test_docs_list(self):
+        args = self._parse(["docs", "list"])
+        self.assertEqual(args.group, "docs")
+        self.assertEqual(args.command, "list")
+
+    def test_docs_list_with_space(self):
+        args = self._parse(["docs", "list", "--space", "personal"])
+        self.assertEqual(args.space, "personal")
+
+    def test_docs_get(self):
+        args = self._parse(["docs", "get", "doc_abc"])
+        self.assertEqual(args.command, "get")
+        self.assertEqual(args.doc_id, "doc_abc")
+
+    def test_docs_create(self):
+        args = self._parse(["docs", "create", "--space", "personal", "--name", "My doc"])
+        self.assertEqual(args.command, "create")
+        self.assertEqual(args.name, "My doc")
+
+    def test_docs_pages(self):
+        args = self._parse(["docs", "pages", "doc_abc"])
+        self.assertEqual(args.command, "pages")
+        self.assertEqual(args.doc_id, "doc_abc")
+
+    def test_docs_get_page(self):
+        args = self._parse(["docs", "get-page", "doc_abc", "page_xyz"])
+        self.assertEqual(args.command, "get-page")
+        self.assertEqual(args.page_id, "page_xyz")
+
+    def test_docs_get_page_format(self):
+        args = self._parse(["docs", "get-page", "doc_abc", "page_xyz", "--format", "plain"])
+        self.assertEqual(args.format, "plain")
+
+    def test_docs_edit_page(self):
+        args = self._parse(["docs", "edit-page", "doc_abc", "page_xyz", "--content", "hi"])
+        self.assertEqual(args.command, "edit-page")
+        self.assertEqual(args.content, "hi")
+
+    def test_docs_edit_page_append(self):
+        args = self._parse(["docs", "edit-page", "doc_abc", "page_xyz", "--content", "hi", "--append"])
+        self.assertTrue(args.append)
+
+    def test_docs_create_page(self):
+        args = self._parse(["docs", "create-page", "doc_abc", "--name", "Notes"])
+        self.assertEqual(args.command, "create-page")
+        self.assertEqual(args.name, "Notes")
+
+    # --- spaces ---
+
+    def test_spaces_list(self):
+        args = self._parse(["spaces", "list"])
+        self.assertEqual(args.group, "spaces")
+        self.assertEqual(args.command, "list")
+
+    def test_spaces_get(self):
+        args = self._parse(["spaces", "get", "myspace"])
+        self.assertEqual(args.command, "get")
+        self.assertEqual(args.space, "myspace")
+
+    def test_spaces_statuses(self):
+        args = self._parse(["spaces", "statuses", "myspace"])
+        self.assertEqual(args.command, "statuses")
+        self.assertEqual(args.space, "myspace")
+
+    # --- folders ---
+
+    def test_folders_list(self):
+        args = self._parse(["folders", "list", "--space", "personal"])
+        self.assertEqual(args.group, "folders")
+        self.assertEqual(args.command, "list")
+
+    def test_folders_get(self):
+        args = self._parse(["folders", "get", "f123"])
+        self.assertEqual(args.command, "get")
+        self.assertEqual(args.folder_id, "f123")
+
+    def test_folders_create(self):
+        args = self._parse(["folders", "create", "--space", "personal", "--name", "Sprint 1"])
+        self.assertEqual(args.command, "create")
+        self.assertEqual(args.name, "Sprint 1")
+
+    def test_folders_update(self):
+        args = self._parse(["folders", "update", "f123", "--name", "Renamed"])
+        self.assertEqual(args.command, "update")
+        self.assertEqual(args.name, "Renamed")
+
+    def test_folders_delete(self):
+        args = self._parse(["folders", "delete", "f123"])
+        self.assertEqual(args.command, "delete")
+        self.assertEqual(args.folder_id, "f123")
+
+    # --- team ---
+
+    def test_team_whoami(self):
+        args = self._parse(["team", "whoami"])
+        self.assertEqual(args.group, "team")
+        self.assertEqual(args.command, "whoami")
+
+    def test_team_members(self):
+        args = self._parse(["team", "members"])
+        self.assertEqual(args.command, "members")
+
+    # --- tags ---
+
+    def test_tags_list(self):
+        args = self._parse(["tags", "list", "--space", "personal"])
+        self.assertEqual(args.group, "tags")
+        self.assertEqual(args.command, "list")
+
+    def test_tags_add(self):
+        args = self._parse(["tags", "add", "task1", "--tag", "urgent"])
+        self.assertEqual(args.command, "add")
+        self.assertEqual(args.tag, "urgent")
+
+    def test_tags_remove(self):
+        args = self._parse(["tags", "remove", "task1", "--tag", "draft"])
+        self.assertEqual(args.command, "remove")
+        self.assertEqual(args.tag, "draft")
+
+    # --- tasks (additional to existing) ---
+
+    def test_tasks_list(self):
+        args = self._parse(["tasks", "list", "--space", "jump"])
+        self.assertEqual(args.group, "tasks")
+        self.assertEqual(args.command, "list")
+
+    def test_tasks_get(self):
+        args = self._parse(["tasks", "get", "abc123"])
+        self.assertEqual(args.command, "get")
+        self.assertEqual(args.task_id, "abc123")
+
+    def test_tasks_get_no_comments(self):
+        args = self._parse(["tasks", "get", "abc123", "--no-comments"])
+        self.assertTrue(args.no_comments)
+
+    def test_tasks_create(self):
+        args = self._parse(["tasks", "create", "--space", "jump", "--name", "Bug"])
+        self.assertEqual(args.command, "create")
+        self.assertEqual(args.name, "Bug")
+
+    def test_tasks_update(self):
+        args = self._parse(["tasks", "update", "abc123", "--status", "done"])
+        self.assertEqual(args.command, "update")
+        self.assertEqual(args.status, "done")
+
+    def test_tasks_delete(self):
+        args = self._parse(["tasks", "delete", "abc123"])
+        self.assertEqual(args.command, "delete")
+
+    def test_tasks_move(self):
+        args = self._parse(["tasks", "move", "abc123", "--to", "personal"])
+        self.assertEqual(args.command, "move")
+        self.assertEqual(args.to_list, "personal")
+
+    def test_tasks_merge(self):
+        args = self._parse(["tasks", "merge", "abc123", "--sources", "d,e"])
+        self.assertEqual(args.command, "merge")
+        self.assertEqual(args.source_ids, "d,e")
+
+    def test_tasks_search(self):
+        args = self._parse(["tasks", "search", "bug", "--space", "jump", "--full"])
+        self.assertEqual(args.command, "search")
+        self.assertTrue(args.full)
+
+
+class FilterTaskFieldsTests(unittest.TestCase):
+    """Tests for filter_task_fields — safety net for DRY extraction."""
+
+    def test_filter_extracts_status_name(self):
+        from clickup_cli.helpers import filter_task_fields
+        task = {"status": {"status": "in progress", "type": "custom"}}
+        result = filter_task_fields(task, ["status"])
+        self.assertEqual(result["status"], "in progress")
+
+    def test_filter_extracts_priority_name(self):
+        from clickup_cli.helpers import filter_task_fields
+        task = {"priority": {"priority": "high", "orderindex": 2}}
+        result = filter_task_fields(task, ["priority"])
+        self.assertEqual(result["priority"], "high")
+
+    def test_filter_priority_none(self):
+        from clickup_cli.helpers import filter_task_fields
+        task = {"priority": None}
+        result = filter_task_fields(task, ["priority"])
+        self.assertIsNone(result["priority"])
+
+    def test_filter_priority_falls_back_to_orderindex(self):
+        from clickup_cli.helpers import filter_task_fields
+        task = {"priority": {"priority": None, "orderindex": 1}}
+        result = filter_task_fields(task, ["priority"])
+        self.assertEqual(result["priority"], "urgent")
+
+    def test_filter_plain_fields(self):
+        from clickup_cli.helpers import filter_task_fields
+        task = {"id": "t1", "name": "Do stuff", "url": "https://x"}
+        result = filter_task_fields(task, ["id", "name", "url"])
+        self.assertEqual(result, {"id": "t1", "name": "Do stuff", "url": "https://x"})
+
+    def test_filter_fields_via_format_tasks(self):
+        tasks = [
+            {
+                "id": "t1",
+                "name": "Task 1",
+                "status": {"status": "open"},
+                "priority": {"priority": "low", "orderindex": 4},
+                "url": "https://x",
+                "extra": "ignored",
+            }
+        ]
+        result = format_tasks(tasks, fields=["id", "status", "priority"])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0], {"id": "t1", "status": "open", "priority": "low"})
+        self.assertNotIn("extra", result[0])
+
+
+class TasksListPaginationTests(unittest.TestCase):
+    """Tests for cmd_tasks_list pagination — safety net for pagination refactor."""
+
+    def test_single_page(self):
+        from clickup_cli.commands.tasks import cmd_tasks_list
+        client = FakeClient(
+            task_pages=[
+                {
+                    "tasks": [
+                        {"id": "t1", "name": "A", "status": {"status": "open"}, "priority": None, "url": "u1"},
+                    ],
+                    "last_page": True,
+                }
+            ]
+        )
+        args = Namespace(
+            space="jump", list_id=None, include_closed=False, status=None,
+            subtasks=False, fields=None, full=False,
+        )
+        result = cmd_tasks_list(client, args)
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["tasks"][0]["id"], "t1")
+
+    def test_multi_page(self):
+        from clickup_cli.commands.tasks import cmd_tasks_list
+        client = FakeClient(
+            task_pages=[
+                {
+                    "tasks": [
+                        {"id": "t1", "name": "A", "status": {"status": "open"}, "priority": None, "url": "u1"},
+                        {"id": "t2", "name": "B", "status": {"status": "open"}, "priority": None, "url": "u2"},
+                    ],
+                    "last_page": False,
+                },
+                {
+                    "tasks": [
+                        {"id": "t3", "name": "C", "status": {"status": "done"}, "priority": None, "url": "u3"},
+                    ],
+                    "last_page": True,
+                },
+            ]
+        )
+        args = Namespace(
+            space="jump", list_id=None, include_closed=False, status=None,
+            subtasks=False, fields=None, full=False,
+        )
+        result = cmd_tasks_list(client, args)
+        self.assertEqual(result["count"], 3)
+        ids = [t["id"] for t in result["tasks"]]
+        self.assertEqual(ids, ["t1", "t2", "t3"])
+
+    def test_full_flag_returns_raw(self):
+        from clickup_cli.commands.tasks import cmd_tasks_list
+        client = FakeClient(
+            task_pages=[
+                {
+                    "tasks": [
+                        {"id": "t1", "name": "A", "status": {"status": "open"}, "priority": None, "url": "u1", "extra": "data"},
+                    ],
+                    "last_page": True,
+                }
+            ]
+        )
+        args = Namespace(
+            space="jump", list_id=None, include_closed=False, status=None,
+            subtasks=False, fields=None, full=True,
+        )
+        result = cmd_tasks_list(client, args)
+        self.assertIn("extra", result["tasks"][0])
+
+
+class TaskSearchPaginationTests(unittest.TestCase):
+    """Tests for multi-page search — safety net for pagination refactor."""
+
+    def test_search_multi_page(self):
+        client = FakeClient(
+            task_pages=[
+                {
+                    "tasks": [
+                        {"id": "t1", "name": "Bug A", "status": {"status": "open"}, "priority": None, "url": "u1"},
+                    ],
+                    "last_page": False,
+                },
+                {
+                    "tasks": [
+                        {"id": "t2", "name": "Bug B", "status": {"status": "open"}, "priority": None, "url": "u2"},
+                    ],
+                    "last_page": True,
+                },
+            ]
+        )
+        args = Namespace(
+            query="Bug", include_closed=False, space=None,
+            list_id=None, folder_id=None, name_prefix=None,
+            fields=None, full=False,
+        )
+        result = cmd_tasks_search(client, args)
+        self.assertEqual(result["count"], 2)
+
+    def test_search_dry_run(self):
+        client = FakeClient(dry_run=True)
+        args = Namespace(
+            query="test", include_closed=False, space=None,
+            list_id=None, folder_id=None, name_prefix=None,
+        )
+        result = cmd_tasks_search(client, args)
+        self.assertTrue(result["dry_run"])
+
+
 class EntrypointTests(unittest.TestCase):
     """Tests for package entrypoint behavior."""
 
@@ -444,7 +820,7 @@ class EntrypointTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(result.returncode, 0)
-        self.assertIn("1.1.0", result.stdout)
+        self.assertIn("1.1.3", result.stdout)
 
 
 class ConfigFallbackTests(unittest.TestCase):

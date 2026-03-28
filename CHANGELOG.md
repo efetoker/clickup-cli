@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.3 (2026-03-29)
+
+- Refactor: split 1633-line `build_parser()` — each command module now owns its parser via `register_parser()`
+- Refactor: extract shared `_paginate_tasks()` helper, removing duplicate pagination logic in tasks list/search
+- Refactor: extract `_extract_status()` and `_extract_priority()` helpers in helpers.py, deduplicating field extraction
+- Clean up dead code in `client.py` (unreachable None guards, pointless variable rename)
+- Expand test suite from 55 to 89 tests — comprehensive parser coverage for all 8 command groups
+- Fix stale version assertion in tests (was checking 1.1.0 instead of current version)
+
 ## 1.1.2 (2026-03-29)
 
 - Add auto-lint hook — ruff check/format runs automatically on every Python file edit

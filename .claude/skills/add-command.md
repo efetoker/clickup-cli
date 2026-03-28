@@ -7,7 +7,7 @@ description: Step-by-step workflow for adding a new CLI command to clickup-cli, 
 
 Follow these steps in order when adding a new command or subcommand.
 
-## 1. Create or extend the command handler
+## 1. Create or extend the command module
 
 - If this is a new command group, create `src/clickup_cli/commands/<group>.py`
 - If extending an existing group, add the handler function to the existing file
@@ -15,22 +15,29 @@ Follow these steps in order when adding a new command or subcommand.
 - Return a dict (will be output as JSON)
 - Mutating commands must check `client.dry_run` and return a dry-run preview instead of calling the API
 
-## 2. Register the handler
+## 2. Add or extend the parser in the same module
+
+- Each command module owns its parser via `register_parser(subparsers, F)`
+- If extending an existing group, add the new subparser inside the existing `register_parser()`
+- If creating a new group, add a `register_parser(subparsers, F)` function that creates the group parser and all its subparsers
+- Add the subparser with:
+  - `description=` — what this command does
+  - `epilog=` — usage examples (at least 2)
+  - `formatter_class=F` (passed in as argument)
+- Add all arguments with `help=` text
+- For mutating commands, `--dry-run` is handled globally (no per-command flag needed)
+
+## 3. Register the handler
 
 - Open `src/clickup_cli/commands/__init__.py`
 - Import the new handler function
 - Add it to the `HANDLERS` dict with key `"<group>_<command>"`
 
-## 3. Add the subparser in cli.py
+## 3b. Wire up new command groups in cli.py (new groups only)
 
-- Open `src/clickup_cli/cli.py`
-- Find the command group's section (or create a new group with `subs.add_parser()`)
-- Add the subparser with:
-  - `description=` — what this command does
-  - `epilog=` — usage examples (at least 2)
-  - `formatter_class=argparse.RawDescriptionHelpFormatter`
-- Add all arguments with `help=` text
-- For mutating commands, `--dry-run` is handled globally (no per-command flag needed)
+- If this is a new command group, open `src/clickup_cli/cli.py`
+- Import `register_parser` from the new module
+- Call it in `build_parser()` alongside the other `register_parser()` calls
 
 ## 4. Write help text
 

@@ -68,24 +68,29 @@ COMPACT_FIELDS = ["id", "name", "status", "priority", "url"]
 PRIORITY_NAMES = {1: "urgent", 2: "high", 3: "normal", 4: "low"}
 
 
-def compact_task(task):
-    """Return a compact view of a task with only essential fields."""
+def _extract_status(task):
+    """Extract the status string from a task's status field."""
     status = task.get("status")
-    status_name = status.get("status") if isinstance(status, dict) else status
+    return status.get("status") if isinstance(status, dict) else status
 
+
+def _extract_priority(task):
+    """Extract the priority string from a task's priority field."""
     priority = task.get("priority")
     if isinstance(priority, dict) and priority:
-        priority_name = priority.get("priority") or PRIORITY_NAMES.get(
+        return priority.get("priority") or PRIORITY_NAMES.get(
             priority.get("orderindex"), "unknown"
         )
-    else:
-        priority_name = None
+    return None
 
+
+def compact_task(task):
+    """Return a compact view of a task with only essential fields."""
     return {
         "id": task.get("id"),
         "name": task.get("name"),
-        "status": status_name,
-        "priority": priority_name,
+        "status": _extract_status(task),
+        "priority": _extract_priority(task),
         "url": task.get("url"),
     }
 
@@ -96,23 +101,11 @@ def filter_task_fields(task, fields):
     Supports nested status/priority extraction: if 'status' or 'priority'
     is requested, returns the string name rather than the nested object.
     """
+    extractors = {"status": _extract_status, "priority": _extract_priority}
     result = {}
     for field in fields:
-        if field == "status":
-            status = task.get("status")
-            result["status"] = (
-                status.get("status") if isinstance(status, dict) else status
-            )
-        elif field == "priority":
-            priority = task.get("priority")
-            if isinstance(priority, dict) and priority:
-                result["priority"] = priority.get("priority") or PRIORITY_NAMES.get(
-                    priority.get("orderindex"), "unknown"
-                )
-            else:
-                result["priority"] = None
-        else:
-            result[field] = task.get(field)
+        extractor = extractors.get(field)
+        result[field] = extractor(task) if extractor else task.get(field)
     return result
 
 
