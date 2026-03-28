@@ -25,6 +25,8 @@ htmlcov/
 
 # Config with real tokens
 clickup-config.json
+.env
+.env.*
 
 # Workflow artifacts
 .planning/

@@ -22,7 +22,7 @@ clickup <group> <command> --help  # full usage for a specific command
 Before any mutating command (create, update, delete), use `--dry-run`:
 
 ```bash
-clickup --dry-run tasks create --space myspace --name "New task"
+clickup --dry-run tasks create --space <space_name> --name "New task"
 ```
 
 Global flags (`--pretty`, `--dry-run`, `--debug`) can appear before or after the command group.
@@ -38,14 +38,14 @@ Global flags (`--pretty`, `--dry-run`, `--debug`) can appear before or after the
 
 ### Find and read a task
 ```bash
-clickup tasks search "login bug" --space myspace
+clickup tasks search "login bug" --space <space_name>
 clickup tasks get <task_id>
 ```
 
 ### Create a task
 ```bash
-clickup --dry-run tasks create --space myspace --name "Fix auth" --desc "Details"
-clickup tasks create --space myspace --name "Fix auth" --desc "Details"
+clickup --dry-run tasks create --space <space_name> --name "Fix auth" --desc "Details"
+clickup tasks create --space <space_name> --name "Fix auth" --desc "Details"
 ```
 
 ### Add a comment
@@ -56,7 +56,7 @@ clickup comments add <task_id> --file report.md
 
 ### Read and edit docs
 ```bash
-clickup docs list --space myspace
+clickup docs list --space <space_name>
 clickup docs pages <doc_id>
 clickup docs get-page <doc_id> <page_id>
 clickup docs edit-page <doc_id> <page_id> --content-file updated.md
@@ -66,9 +66,9 @@ clickup docs edit-page <doc_id> <page_id> --content "New section" --append
 ### Discover workspace structure
 ```bash
 clickup spaces list
-clickup folders list --space myspace
+clickup folders list --space <space_name>
 clickup lists list --folder <folder_id>
-clickup spaces statuses myspace
+clickup spaces statuses <space_name>
 ```
 
 ## Configuration

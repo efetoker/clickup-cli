@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.1 (2026-03-29)
+
+- Add `.env` and `.env.*` to `.gitignore` for API token safety
+- Add `scripts/validate-cli-output.sh` — validates all CLI help commands, error routing, and version flag
+- Add `.claude/skills/add-command.md` — prescriptive dev workflow for adding new commands
+- Replace hardcoded `myspace` with `<name>` / `<space_name>` placeholders in skill and README
+
 ## 1.1.0 (2026-03-29)
 
 - Auto-detect workspace ID for single-workspace accounts — no need to set it manually

@@ -26,11 +26,11 @@ Get your API token at [app.clickup.com/settings/apps](https://app.clickup.com/se
 
 ```bash
 clickup spaces list                                    # see your spaces
-clickup tasks list --space myspace                     # list tasks
+clickup tasks list --space <name>                     # list tasks
 clickup tasks search "login bug"                       # search across workspace
 clickup tasks get abc123                               # get task + comments
-clickup --dry-run tasks create --space myspace --name "Fix auth"  # preview
-clickup tasks create --space myspace --name "Fix auth" # create for real
+clickup --dry-run tasks create --space <name> --name "Fix auth"  # preview
+clickup tasks create --space <name> --name "Fix auth" # create for real
 clickup comments add abc123 --text "Done"              # add a comment
 ```
 
@@ -83,8 +83,8 @@ Use `clickup <group> <command> --help` for detailed usage, examples, and return 
 Global flags can appear before or after the command group:
 
 ```bash
-clickup --pretty tasks list --space myspace
-clickup tasks list --space myspace --pretty
+clickup --pretty tasks list --space <name>
+clickup tasks list --space <name> --pretty
 ```
 
 ## Key Behaviors
