@@ -6,7 +6,6 @@ import os
 import sys
 import tempfile
 import unittest
-from argparse import Namespace
 from unittest.mock import MagicMock
 
 from clickup_cli.helpers import (

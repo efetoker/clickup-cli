@@ -1,7 +1,5 @@
 """Tests for all command handlers — behavioral coverage for every command module."""
 
-import io
-import sys
 import unittest
 from argparse import Namespace
 from unittest.mock import MagicMock, patch
@@ -286,7 +284,7 @@ class DocsListTests(unittest.TestCase):
     def test_list_with_space_filter(self):
         client = FlexClient(responses={"/docs": {"docs": [{"id": "d1"}]}})
         args = Namespace(space="testspace")
-        result = cmd_docs_list(client, args)
+        cmd_docs_list(client, args)
         # Should have included parent_id param
         params = client.calls[0]["params"]
         self.assertIn("parent_id", params)
@@ -363,7 +361,7 @@ class DocsGetPageTests(unittest.TestCase):
             "/pages/": {"id": "p1", "content": "# Hello"}
         })
         args = Namespace(doc_id="d1", page_id="p1", format="md")
-        result = cmd_docs_get_page(client, args)
+        cmd_docs_get_page(client, args)
         params = client.calls[0]["params"]
         self.assertEqual(params["content_format"], "text/md")
 
@@ -372,7 +370,7 @@ class DocsGetPageTests(unittest.TestCase):
             "/pages/": {"id": "p1", "content": "Hello"}
         })
         args = Namespace(doc_id="d1", page_id="p1", format="plain")
-        result = cmd_docs_get_page(client, args)
+        cmd_docs_get_page(client, args)
         params = client.calls[0]["params"]
         self.assertEqual(params["content_format"], "text/plain")
 
@@ -383,7 +381,7 @@ class DocsEditPageTests(unittest.TestCase):
         client = FlexClient(responses={"/pages/": {"id": "p1", "content": "New"}})
         args = Namespace(doc_id="d1", page_id="p1", content="New",
                          content_file=None, name=None, append=False)
-        result = cmd_docs_edit_page(client, args)
+        cmd_docs_edit_page(client, args)
         body = client.calls[-1]["data"]
         self.assertEqual(body["content"], "New")
         self.assertEqual(body["content_format"], "text/md")
@@ -392,7 +390,7 @@ class DocsEditPageTests(unittest.TestCase):
         client = FlexClient(responses={"/pages/": {"id": "p1", "name": "New Name"}})
         args = Namespace(doc_id="d1", page_id="p1", content=None,
                          content_file=None, name="New Name", append=False)
-        result = cmd_docs_edit_page(client, args)
+        cmd_docs_edit_page(client, args)
         body = client.calls[-1]["data"]
         self.assertEqual(body["name"], "New Name")
         self.assertNotIn("content", body)
@@ -419,7 +417,7 @@ class DocsCreatePageTests(unittest.TestCase):
         client = FlexClient(responses={"/pages": {"id": "p2"}})
         args = Namespace(doc_id="d1", name="Notes", content="# Notes",
                          content_file=None)
-        result = cmd_docs_create_page(client, args)
+        cmd_docs_create_page(client, args)
         body = client.calls[-1]["data"]
         self.assertEqual(body["name"], "Notes")
         self.assertEqual(body["content"], "# Notes")
@@ -428,7 +426,7 @@ class DocsCreatePageTests(unittest.TestCase):
         client = FlexClient(responses={"/pages": {"id": "p2"}})
         args = Namespace(doc_id="d1", name="Empty", content=None,
                          content_file=None)
-        result = cmd_docs_create_page(client, args)
+        cmd_docs_create_page(client, args)
         body = client.calls[-1]["data"]
         self.assertEqual(body["name"], "Empty")
         self.assertNotIn("content", body)
@@ -592,7 +590,7 @@ class ListsCreateTests(unittest.TestCase):
         client = FlexClient(responses={"/list": {"id": "l1"}})
         args = Namespace(folder="f1", space=None, name="Tasks",
                          content="Description", status="active")
-        result = cmd_lists_create(client, args)
+        cmd_lists_create(client, args)
         body = client.calls[-1]["data"]
         self.assertEqual(body["content"], "Description")
         self.assertEqual(body["status"], "active")
@@ -625,7 +623,7 @@ class ListsUpdateTests(unittest.TestCase):
         client = FlexClient(responses={"/list/": {"id": "l1"}})
         args = Namespace(list_id="l1", name=None, content="Desc",
                          content_file=None, status="active")
-        result = cmd_lists_update(client, args)
+        cmd_lists_update(client, args)
         body = client.calls[-1]["data"]
         self.assertEqual(body["content"], "Desc")
         self.assertEqual(body["status"], "active")
@@ -677,7 +675,7 @@ class SpacesGetTests(unittest.TestCase):
             "/space/": {"id": "99999", "name": "Raw"}
         })
         args = Namespace(space="99999")
-        result = cmd_spaces_get(client, args)
+        cmd_spaces_get(client, args)
         self.assertIn("/space/99999", client.calls[0]["path"])
 
 
@@ -888,14 +886,14 @@ class TasksMoveTests(unittest.TestCase):
     def test_move_with_space_name(self):
         client = FlexClient(responses={"/home_list/": {"id": "t1"}})
         args = Namespace(task_id="t1", to_list="testspace")
-        result = cmd_tasks_move(client, args)
+        cmd_tasks_move(client, args)
         # Should resolve testspace -> list_id 222
         self.assertIn("/home_list/222", client.calls[0]["path"])
 
     def test_move_with_raw_id(self):
         client = FlexClient(responses={"/home_list/": {"id": "t1"}})
         args = Namespace(task_id="t1", to_list="99999")
-        result = cmd_tasks_move(client, args)
+        cmd_tasks_move(client, args)
         self.assertIn("/home_list/99999", client.calls[0]["path"])
 
     def test_move_dry_run(self):
@@ -918,7 +916,7 @@ class TasksMergeTests(unittest.TestCase):
     def test_merge_actual(self):
         client = FlexClient(responses={"/merge": {"id": "target"}})
         args = Namespace(task_id="target", source_ids="a,b")
-        result = cmd_tasks_merge(client, args)
+        cmd_tasks_merge(client, args)
         body = client.calls[-1]["data"]
         self.assertEqual(body["task_ids"], ["a", "b"])
 
@@ -947,7 +945,7 @@ class TasksUpdateBehaviorTests(unittest.TestCase):
         client = FlexClient(responses={"/task/": {"id": "t1", "name": "New"}})
         args = Namespace(task_id="t1", name="New", status=None,
                          desc=None, desc_file=None, priority=None)
-        result = cmd_tasks_update(client, args)
+        cmd_tasks_update(client, args)
         body = client.calls[-1]["data"]
         self.assertEqual(body["name"], "New")
 
@@ -955,7 +953,7 @@ class TasksUpdateBehaviorTests(unittest.TestCase):
         client = FlexClient(responses={"/task/": {"id": "t1"}})
         args = Namespace(task_id="t1", name=None, status="done",
                          desc=None, desc_file=None, priority=None)
-        result = cmd_tasks_update(client, args)
+        cmd_tasks_update(client, args)
         body = client.calls[-1]["data"]
         self.assertEqual(body["status"], "done")
 
@@ -963,7 +961,7 @@ class TasksUpdateBehaviorTests(unittest.TestCase):
         client = FlexClient(responses={"/task/": {"id": "t1"}})
         args = Namespace(task_id="t1", name=None, status=None,
                          desc=None, desc_file=None, priority="high")
-        result = cmd_tasks_update(client, args)
+        cmd_tasks_update(client, args)
         body = client.calls[-1]["data"]
         self.assertEqual(body["priority"], 2)
 
@@ -1061,7 +1059,7 @@ class TasksSearchBehaviorTests(unittest.TestCase):
         args = Namespace(query="bug", include_closed=False, space="testspace",
                          list_id=None, folder_id=None, name_prefix=None,
                          fields=None, full=False)
-        result = cmd_tasks_search(client, args)
+        cmd_tasks_search(client, args)
         params = client.calls[0]["params"]
         self.assertEqual(params["list_ids[]"], "222")  # testspace list_id
 
@@ -1072,7 +1070,7 @@ class TasksSearchBehaviorTests(unittest.TestCase):
         args = Namespace(query="bug", include_closed=False, space=None,
                          list_id="custom_list", folder_id=None, name_prefix=None,
                          fields=None, full=False)
-        result = cmd_tasks_search(client, args)
+        cmd_tasks_search(client, args)
         params = client.calls[0]["params"]
         self.assertEqual(params["list_ids[]"], "custom_list")
 
@@ -1083,7 +1081,7 @@ class TasksSearchBehaviorTests(unittest.TestCase):
         args = Namespace(query="bug", include_closed=False, space=None,
                          list_id=None, folder_id="f123", name_prefix=None,
                          fields=None, full=False)
-        result = cmd_tasks_search(client, args)
+        cmd_tasks_search(client, args)
         params = client.calls[0]["params"]
         self.assertEqual(params["project_ids[]"], "f123")
 
