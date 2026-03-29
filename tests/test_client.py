@@ -6,6 +6,8 @@ import time
 import unittest
 from unittest.mock import MagicMock, patch
 
+import requests
+
 from clickup_cli.client import ClickUpClient
 
 
@@ -283,6 +285,29 @@ class ResponseParsingTests(ClientSetupMixin, unittest.TestCase):
 
         result = client.get_v2("/test")
         self.assertEqual(result, {})
+
+
+class RetryConnectionErrorTests(ClientSetupMixin, unittest.TestCase):
+    """Tests for 429 retry path where the retry itself fails."""
+
+    @patch("time.sleep")
+    def test_429_retry_connection_error_exits(self, mock_sleep):
+        """When 429 triggers a retry but the retry raises ConnectionError, exit."""
+        client = self._make_client()
+
+        mock_429 = self._mock_response(429, ok=False, text="Rate limited")
+        mock_429.headers = {"X-RateLimit-Reset": str(int(time.time()) + 1)}
+
+        # First call returns 429, retry raises ConnectionError
+        client.session.request = MagicMock(
+            side_effect=[mock_429, requests.ConnectionError("Network down")]
+        )
+
+        with self.assertRaises(SystemExit):
+            client.get_v2("/test")
+
+        self.assertEqual(client.session.request.call_count, 2)
+        mock_sleep.assert_called_once()
 
 
 if __name__ == "__main__":

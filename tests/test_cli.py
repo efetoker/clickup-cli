@@ -1074,5 +1074,50 @@ class SpaceInferenceTests(unittest.TestCase):
         self.assertEqual(args.space, "personal")
 
 
+class MainFunctionTests(unittest.TestCase):
+    """Tests for main() branches that aren't covered by subprocess tests."""
+
+    @patch("sys.argv", ["clickup", "init", "--token", "pk_test"])
+    @patch("clickup_cli.commands.init.cmd_init")
+    def test_main_dispatches_init(self, mock_cmd_init):
+        """main() dispatches to cmd_init when group is 'init'."""
+        from clickup_cli.cli import main
+        main()
+        mock_cmd_init.assert_called_once()
+
+    @patch("sys.argv", ["clickup", "tasks", "list", "--space", "test"])
+    @patch("clickup_cli.config.load_config", return_value={"api_token": ""})
+    def test_main_no_token_errors(self, mock_config):
+        """main() exits with error when no API token is found."""
+        with patch.dict(os.environ, {"CLICKUP_API_TOKEN": ""}):
+            from clickup_cli.cli import main
+            with self.assertRaises(SystemExit):
+                main()
+
+    @patch("sys.argv", ["clickup", "tasks", "list", "--space", "test"])
+    @patch("clickup_cli.cli.output")
+    @patch("clickup_cli.cli.dispatch", return_value=None)
+    @patch("clickup_cli.cli.ClickUpClient")
+    @patch("clickup_cli.config.load_config", return_value={"api_token": "pk_test"})
+    def test_main_result_none_no_output(self, mock_config, mock_client_cls,
+                                         mock_dispatch, mock_output):
+        """When dispatch returns None, output() is not called."""
+        from clickup_cli.cli import main
+        main()
+        mock_output.assert_not_called()
+
+    @patch("sys.argv", ["clickup", "tasks", "list", "--space", "test"])
+    @patch("clickup_cli.cli.output")
+    @patch("clickup_cli.cli.dispatch", return_value={"tasks": []})
+    @patch("clickup_cli.cli.ClickUpClient")
+    @patch("clickup_cli.config.load_config", return_value={"api_token": "pk_test"})
+    def test_main_normal_dispatch_calls_output(self, mock_config, mock_client_cls,
+                                                mock_dispatch, mock_output):
+        """Normal dispatch path: result is not None, output() is called."""
+        from clickup_cli.cli import main
+        main()
+        mock_output.assert_called_once_with({"tasks": []}, pretty=False)
+
+
 if __name__ == "__main__":
     unittest.main()

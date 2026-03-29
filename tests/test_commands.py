@@ -6,6 +6,8 @@ import unittest
 from argparse import Namespace
 from unittest.mock import MagicMock, patch
 
+import requests
+
 from clickup_cli.commands.comments import (
     cmd_comments_add,
     cmd_comments_delete,
@@ -60,6 +62,7 @@ from clickup_cli.commands.tasks import (
     cmd_tasks_update,
     cmd_tasks_search,
 )
+from clickup_cli.commands.init import cmd_init
 
 
 class FlexClient:
@@ -1103,6 +1106,293 @@ class DispatchTests(unittest.TestCase):
         args = Namespace(group="fake", command="nope")
         with self.assertRaises(SystemExit):
             dispatch(client, args)
+
+
+class DocsCreateContentTests(unittest.TestCase):
+    """Tests for cmd_docs_create with initial content writing."""
+
+    def test_create_with_content_writes_to_default_page(self):
+        """When content is provided, it writes to the auto-created default page."""
+        call_log = []
+
+        def track_handler(method, path, **kwargs):
+            call_log.append({"method": method, "path": path, **kwargs})
+            if method == "POST_V3" and "/docs" in path and "/pages" not in path:
+                return {"id": "doc_new", "name": "Doc"}
+            if method == "GET_V3" and "/pages" in path:
+                return {"pages": [{"id": "page_default"}]}
+            if method == "PUT_V3" and "/pages/page_default" in path:
+                return {"updated": True}
+            return {}
+
+        client = FlexClient()
+        client._handle = lambda method, path, **kw: track_handler(method, path, **kw)
+        client.dry_run = False
+
+        args = Namespace(space="testspace", name="Doc", content="# Hello",
+                         content_file=None, visibility=None)
+        result = cmd_docs_create(client, args)
+        self.assertEqual(result["id"], "doc_new")
+        self.assertTrue(result.get("_initial_content_written"))
+        self.assertEqual(result.get("_page_id"), "page_default")
+
+    def test_create_with_content_no_pages_returned(self):
+        """When API returns no pages, content is silently skipped."""
+        def track_handler(method, path, **kwargs):
+            if method == "POST_V3" and "/docs" in path and "/pages" not in path:
+                return {"id": "doc_new", "name": "Doc"}
+            if method == "GET_V3" and "/pages" in path:
+                return {"pages": []}
+            return {}
+
+        client = FlexClient()
+        client._handle = lambda method, path, **kw: track_handler(method, path, **kw)
+        client.dry_run = False
+
+        args = Namespace(space="testspace", name="Doc", content="# Hello",
+                         content_file=None, visibility=None)
+        result = cmd_docs_create(client, args)
+        self.assertEqual(result["id"], "doc_new")
+        self.assertNotIn("_initial_content_written", result)
+
+    def test_create_with_content_no_doc_id(self):
+        """When API returns no doc ID, content writing is skipped."""
+        def track_handler(method, path, **kwargs):
+            if method == "POST_V3":
+                return {"name": "Doc"}  # No "id" field
+            return {}
+
+        client = FlexClient()
+        client._handle = lambda method, path, **kw: track_handler(method, path, **kw)
+        client.dry_run = False
+
+        args = Namespace(space="testspace", name="Doc", content="# Hello",
+                         content_file=None, visibility=None)
+        result = cmd_docs_create(client, args)
+        self.assertNotIn("_initial_content_written", result)
+
+
+# ─── Init Command ─────────────────────────────────────────────────────────
+
+
+class InitTokenFlagTests(unittest.TestCase):
+    """Tests for cmd_init with --token flag path."""
+
+    @patch("clickup_cli.commands.init.requests.get")
+    def test_token_flag_skips_input_prompt(self, mock_get):
+        """--token flag bypasses interactive input."""
+        mock_team_resp = MagicMock()
+        mock_team_resp.status_code = 200
+        mock_team_resp.ok = True
+        mock_team_resp.json.return_value = {
+            "teams": [{
+                "id": "ws1", "name": "TestWS",
+                "members": [{"user": {"id": "u1", "username": "efe"}}]
+            }]
+        }
+
+        mock_spaces_resp = MagicMock()
+        mock_spaces_resp.status_code = 200
+        mock_spaces_resp.ok = True
+        mock_spaces_resp.json.return_value = {"spaces": []}
+
+        # side_effect: first call = /team, second call = /space
+        mock_get.side_effect = [mock_team_resp, mock_spaces_resp]
+
+        args = Namespace(token="pk_test_123")
+        with patch("builtins.open", unittest.mock.mock_open()):
+            with patch("os.makedirs"):
+                cmd_init(args)
+
+        # Should NOT have called input() — token was provided via flag
+        self.assertEqual(mock_get.call_count, 2)
+
+
+class InitErrorTests(unittest.TestCase):
+    """Tests for cmd_init error paths."""
+
+    def test_empty_token_exits(self):
+        """Empty token after input prompt exits."""
+        args = Namespace(token=None)
+        with patch("builtins.input", return_value=""):
+            with self.assertRaises(SystemExit):
+                cmd_init(args)
+
+    @patch("clickup_cli.commands.init.requests.get")
+    def test_connection_error_exits(self, mock_get):
+        """Network error when fetching teams exits."""
+        mock_get.side_effect = requests.ConnectionError("Network down")
+        args = Namespace(token="pk_test")
+        with self.assertRaises(SystemExit):
+            cmd_init(args)
+
+    @patch("clickup_cli.commands.init.requests.get")
+    def test_401_invalid_token_exits(self, mock_get):
+        """401 response exits with auth error."""
+        resp = MagicMock()
+        resp.status_code = 401
+        resp.ok = False
+        mock_get.return_value = resp
+        args = Namespace(token="pk_bad")
+        with self.assertRaises(SystemExit):
+            cmd_init(args)
+
+    @patch("clickup_cli.commands.init.requests.get")
+    def test_non_ok_response_exits(self, mock_get):
+        """Non-200 non-401 response exits."""
+        resp = MagicMock()
+        resp.status_code = 500
+        resp.ok = False
+        resp.text = "Server Error"
+        mock_get.return_value = resp
+        args = Namespace(token="pk_test")
+        with self.assertRaises(SystemExit):
+            cmd_init(args)
+
+    @patch("clickup_cli.commands.init.requests.get")
+    def test_no_workspaces_exits(self, mock_get):
+        """Empty teams list exits."""
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.ok = True
+        resp.json.return_value = {"teams": []}
+        mock_get.return_value = resp
+        args = Namespace(token="pk_test")
+        with self.assertRaises(SystemExit):
+            cmd_init(args)
+
+
+class InitWorkspaceSelectionTests(unittest.TestCase):
+    """Tests for workspace and member selection in cmd_init."""
+
+    def _make_team_response(self, teams):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.ok = True
+        resp.json.return_value = {"teams": teams}
+        return resp
+
+    def _make_spaces_response(self, spaces=None):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.ok = True
+        resp.json.return_value = {"spaces": spaces or []}
+        return resp
+
+    def _make_lists_response(self, lists=None):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.ok = True
+        resp.json.return_value = {"lists": lists or []}
+        return resp
+
+    @patch("clickup_cli.commands.init.requests.get")
+    def test_single_workspace_auto_selects(self, mock_get):
+        """Single workspace is auto-selected without prompting."""
+        team = {"id": "ws1", "name": "MyWS",
+                "members": [{"user": {"id": "u1", "username": "efe"}}]}
+        mock_get.side_effect = [
+            self._make_team_response([team]),
+            self._make_spaces_response(),
+        ]
+        args = Namespace(token="pk_test")
+        with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
+            with patch("os.makedirs"):
+                cmd_init(args)
+
+        # Verify config was written with correct workspace_id
+        written = mock_file().write.call_args_list
+        written_text = "".join(call[0][0] for call in written)
+        self.assertIn("ws1", written_text)
+
+    @patch("clickup_cli.commands.init.requests.get")
+    def test_multiple_workspaces_prompts_selection(self, mock_get):
+        """Multiple workspaces prompts user for selection."""
+        teams = [
+            {"id": "ws1", "name": "WS1", "members": [{"user": {"id": "u1", "username": "efe"}}]},
+            {"id": "ws2", "name": "WS2", "members": []},
+        ]
+        mock_get.side_effect = [
+            self._make_team_response(teams),
+            self._make_spaces_response(),
+        ]
+        args = Namespace(token="pk_test")
+        with patch("builtins.input", return_value="2"):
+            with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
+                with patch("os.makedirs"):
+                    cmd_init(args)
+
+        written = mock_file().write.call_args_list
+        written_text = "".join(call[0][0] for call in written)
+        self.assertIn("ws2", written_text)
+
+    @patch("clickup_cli.commands.init.requests.get")
+    def test_multiple_members_skip_selection(self, mock_get):
+        """When user presses Enter on member selection, user_id stays empty."""
+        team = {"id": "ws1", "name": "MyWS", "members": [
+            {"user": {"id": "u1", "username": "alice", "email": "a@x.com"}},
+            {"user": {"id": "u2", "username": "bob", "email": "b@x.com"}},
+        ]}
+        mock_get.side_effect = [
+            self._make_team_response([team]),
+            self._make_spaces_response(),
+        ]
+        args = Namespace(token="pk_test")
+        with patch("builtins.input", return_value=""):
+            with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
+                with patch("os.makedirs"):
+                    cmd_init(args)
+
+        written = mock_file().write.call_args_list
+        written_text = "".join(call[0][0] for call in written)
+        self.assertIn('"user_id": ""', written_text)
+
+    @patch("clickup_cli.commands.init.requests.get")
+    def test_spaces_fetched_and_config_written(self, mock_get):
+        """Spaces are fetched and included in the config file."""
+        team = {"id": "ws1", "name": "MyWS",
+                "members": [{"user": {"id": "u1", "username": "efe"}}]}
+
+        spaces_resp = self._make_spaces_response([
+            {"id": "s1", "name": "Personal"},
+        ])
+        lists_resp = self._make_lists_response([{"id": "L1"}])
+
+        mock_get.side_effect = [
+            self._make_team_response([team]),
+            spaces_resp,
+            lists_resp,  # lists fetch for space "Personal"
+        ]
+        args = Namespace(token="pk_test")
+        with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
+            with patch("os.makedirs"):
+                cmd_init(args)
+
+        written = mock_file().write.call_args_list
+        written_text = "".join(call[0][0] for call in written)
+        self.assertIn("personal", written_text)
+        self.assertIn("s1", written_text)
+        self.assertIn("L1", written_text)
+
+    @patch("clickup_cli.commands.init.requests.get")
+    def test_eof_during_workspace_selection_exits(self, mock_get):
+        """EOFError during workspace selection aborts gracefully."""
+        teams = [
+            {"id": "ws1", "name": "WS1", "members": []},
+            {"id": "ws2", "name": "WS2", "members": []},
+        ]
+        mock_get.return_value = self._make_team_response(teams)
+        args = Namespace(token="pk_test")
+        with patch("builtins.input", side_effect=EOFError):
+            with self.assertRaises(SystemExit):
+                cmd_init(args)
+
+    def test_eof_during_token_input_exits(self):
+        """EOFError during token input aborts gracefully."""
+        args = Namespace(token=None)
+        with patch("builtins.input", side_effect=EOFError):
+            with self.assertRaises(SystemExit):
+                cmd_init(args)
 
 
 if __name__ == "__main__":

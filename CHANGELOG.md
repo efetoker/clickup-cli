@@ -5,7 +5,7 @@
 - Accept flag aliases for all positional arguments — agents can now use `--task-id`, `--query`, `--doc-id`, `--page-id`, `--folder-id`, `--list-id`, `--comment-id`, `--space` instead of positional args. Both forms work; positional args are unchanged for backwards compatibility.
 - Auto-infer `--space` from `--list` on `tasks create` — when `--list` is provided without `--space`, the CLI fetches the list metadata via API to resolve its parent space automatically. Eliminates the most common agent error (12+ failures in 3 days).
 - Make `--space` optional on `tasks create` (was required) — now only required if `--list` is also absent.
-- Expand test suite from 89 to 106 tests — flag alias parsing, space inference, error cases.
+- Expand test suite to 305 tests — full behavioral coverage for `cmd_init` (12 tests), `main()` integration (4 tests), `cmd_docs_create` content paths (3 tests), and 429 retry edge case (1 test).
 
 ## 1.1.3 (2026-03-29)
 
