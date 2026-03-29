@@ -1,6 +1,6 @@
 """Folder command handlers — list, get, create, update, delete."""
 
-from ..helpers import error, resolve_space_id
+from ..helpers import error, resolve_space_id, add_id_argument
 
 
 def register_parser(subparsers, F):
@@ -78,7 +78,7 @@ examples:
   clickup folders get 12345
   clickup --pretty folders get 12345""",
     )
-    fg.add_argument("folder_id", type=str, help="ClickUp folder ID")
+    add_id_argument(fg, "folder_id", "ClickUp folder ID")
 
     # folders create
     fc = folders_sub.add_parser(
@@ -126,7 +126,7 @@ examples:
   clickup folders update 12345 --name "Renamed folder"
   clickup --dry-run folders update 12345 --name "Test rename" """,
     )
-    fu.add_argument("folder_id", type=str, help="ClickUp folder ID to update")
+    add_id_argument(fu, "folder_id", "ClickUp folder ID to update")
     fu.add_argument("--name", type=str, help="New folder name")
 
     # folders delete
@@ -151,7 +151,7 @@ examples:
   clickup --dry-run folders delete 12345
   clickup folders delete 12345""",
     )
-    fd.add_argument("folder_id", type=str, help="ClickUp folder ID to delete")
+    add_id_argument(fd, "folder_id", "ClickUp folder ID to delete")
 
 
 def cmd_folders_list(client, args):

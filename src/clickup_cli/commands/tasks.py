@@ -6,7 +6,7 @@ import sys
 import requests
 
 from ..config import WORKSPACE_ID, SPACES, USER_ID, DEFAULT_TAGS, DRAFT_TAG, GOOD_AS_IS_TAG, DEFAULT_PRIORITY
-from ..helpers import read_content, error, format_tasks, fetch_all_comments
+from ..helpers import read_content, error, format_tasks, fetch_all_comments, add_id_argument
 
 
 def register_parser(subparsers, F):
@@ -153,7 +153,7 @@ examples:
   clickup --pretty tasks get abc123
   clickup tasks get abc123 --no-comments""",
     )
-    tg.add_argument("task_id", type=str, help="ClickUp task ID")
+    add_id_argument(tg, "task_id", "ClickUp task ID")
     tg.add_argument(
         "--no-comments",
         action="store_true",
@@ -204,9 +204,8 @@ notes:
     )
     tc.add_argument(
         "--space",
-        required=True,
         type=str,
-        help="Target space (required)",
+        help="Target space (auto-inferred from --list if omitted)",
     )
     tc.add_argument(
         "--list",
@@ -277,7 +276,7 @@ notes:
   --desc and --desc-file are mutually exclusive. Using both is an error.
   Does not support: changing assignees, tags, or custom fields.""",
     )
-    tu.add_argument("task_id", type=str, help="ClickUp task ID to update")
+    add_id_argument(tu, "task_id", "ClickUp task ID to update")
     tu.add_argument("--name", type=str, help="New task name")
     tu.add_argument("--status", type=str, help="New status (space-specific)")
     tu.add_argument(
@@ -332,7 +331,7 @@ notes:
   The search API has a default page size — this CLI handles pagination
   automatically and returns all matching results.""",
     )
-    ts.add_argument("query", type=str, help="Search query string")
+    add_id_argument(ts, "query", "Search query string")
     ts.add_argument(
         "--include-closed",
         action="store_true",
@@ -385,7 +384,7 @@ examples:
   clickup --dry-run tasks delete abc123
   clickup tasks delete abc123""",
     )
-    td.add_argument("task_id", type=str, help="ClickUp task ID to delete")
+    add_id_argument(td, "task_id", "ClickUp task ID to delete")
 
     # tasks move
     tm = tasks_sub.add_parser(
@@ -412,7 +411,7 @@ examples:
   clickup tasks move abc123 --to 901816700000
   clickup --dry-run tasks move abc123 --to <space-or-list-id>""",
     )
-    tm.add_argument("task_id", type=str, help="ClickUp task ID to move")
+    add_id_argument(tm, "task_id", "ClickUp task ID to move")
     tm.add_argument(
         "--to",
         required=True,
@@ -443,7 +442,7 @@ examples:
   clickup tasks merge abc123 --sources def456,ghi789
   clickup --dry-run tasks merge abc123 --sources def456""",
     )
-    tmg.add_argument("task_id", type=str, help="Target task ID (tasks merge into this)")
+    add_id_argument(tmg, "task_id", "Target task ID (tasks merge into this)")
     tmg.add_argument(
         "--sources",
         required=True,
@@ -553,9 +552,30 @@ def cmd_tasks_get(client, args):
     return task
 
 
+def _infer_space_from_list(client, list_id):
+    """Look up a list via API to find its parent space. Returns space name or ID."""
+    resp = client.get_v2(f"/list/{list_id}", allow_dry_run=True)
+    space_info = resp.get("space", {})
+    space_id = space_info.get("id")
+    if not space_id:
+        return None
+    for name, cfg in SPACES.items():
+        if cfg.get("space_id") == str(space_id):
+            return name
+    return str(space_id)
+
+
 def cmd_tasks_create(client, args):
+    if not args.space and getattr(args, "list_id", None):
+        inferred = _infer_space_from_list(client, args.list_id)
+        if inferred:
+            args.space = inferred
+            print(
+                f"hint: inferred --space {inferred} from --list {args.list_id}",
+                file=sys.stderr,
+            )
     if not args.space:
-        error("--space is required for task creation (needed to resolve target list)")
+        error("--space is required (or provide --list to auto-infer the space)")
 
     list_id = _resolve_list_id(args)
     desc = read_content(args.desc, args.desc_file, "--desc")

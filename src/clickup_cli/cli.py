@@ -5,7 +5,7 @@ import os
 import sys
 
 from .client import ClickUpClient
-from .helpers import output, error
+from .helpers import output, error, resolve_id_args
 
 
 GLOBAL_FLAGS = {"--pretty", "--dry-run", "--debug"}
@@ -155,6 +155,7 @@ def dispatch(client, args):
 def main():
     parser = build_parser()
     args = parser.parse_args(normalize_cli_argv(sys.argv[1:]))
+    resolve_id_args(args)
 
     # Handle init before loading config (config may not exist yet)
     if args.group == "init":

@@ -1,6 +1,6 @@
 """List command handlers — list, get, create, update, delete."""
 
-from ..helpers import read_content, error, resolve_space_id
+from ..helpers import read_content, error, resolve_space_id, add_id_argument
 
 
 def register_parser(subparsers, F):
@@ -87,7 +87,7 @@ examples:
   clickup lists get 901816700000
   clickup --pretty lists get 12345""",
     )
-    lg.add_argument("list_id", type=str, help="ClickUp list ID")
+    add_id_argument(lg, "list_id", "ClickUp list ID")
 
     # lists create
     lc = lists_sub.add_parser(
@@ -153,7 +153,7 @@ examples:
   clickup lists update 12345 --content "Updated description"
   clickup --dry-run lists update 12345 --name "Test rename" """,
     )
-    lu.add_argument("list_id", type=str, help="ClickUp list ID to update")
+    add_id_argument(lu, "list_id", "ClickUp list ID to update")
     lu.add_argument("--name", type=str, help="New list name")
     lu.add_argument(
         "--content",
@@ -186,7 +186,7 @@ examples:
   clickup --dry-run lists delete 12345
   clickup lists delete 12345""",
     )
-    ld.add_argument("list_id", type=str, help="ClickUp list ID to delete")
+    add_id_argument(ld, "list_id", "ClickUp list ID to delete")
 
 
 def cmd_lists_list(client, args):

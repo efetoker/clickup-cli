@@ -27,6 +27,27 @@ src/clickup_cli/
 
 Each command module owns both its argparse parser definition (`register_parser()`) and its handler functions. `cli.py` builds the root parser and delegates to each module's `register_parser(subparsers, F)`.
 
+## Argument Pattern: Positional + Flag Aliases
+
+Every positional argument (task_id, query, doc_id, page_id, etc.) also accepts a `--flag` form via `add_id_argument()` from helpers.py. This makes the CLI usable by both humans (positional) and AI agents (flags).
+
+```python
+# In register_parser():
+add_id_argument(parser, "task_id", "ClickUp task ID")
+
+# Accepts both:
+#   clickup tasks get abc123
+#   clickup tasks get --task-id abc123
+```
+
+Resolution happens in `cli.py` via `resolve_id_args(args)` after parsing. If both forms are provided, it errors. If neither is provided, it errors with a helpful message.
+
+When adding new commands with ID arguments, always use `add_id_argument()` instead of `parser.add_argument()` for positional IDs.
+
+## Space Inference
+
+`tasks create` auto-infers `--space` from `--list` via a lazy API lookup (`GET /v2/list/{id}`). The `_infer_space_from_list()` function in tasks.py reverse-maps the space ID to a config name. This eliminates the most common agent error.
+
 ## Development Setup
 
 ```bash

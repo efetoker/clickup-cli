@@ -1,7 +1,52 @@
 """Shared helper functions for output, errors, and content reading."""
 
+import argparse
 import json
 import sys
+
+
+def add_id_argument(parser, name, help_text):
+    """Add an argument that accepts both positional and --flag forms.
+
+    Agents naturally use flag forms (--task-id) while humans prefer positional.
+    This adds both so either style works.
+
+    Example:
+        add_id_argument(parser, 'task_id', 'ClickUp task ID')
+        # Accepts: `command abc123` OR `command --task-id abc123`
+    """
+    parser.add_argument(name, nargs="?", default=None, help=help_text)
+    flag = f"--{name.replace('_', '-')}"
+    parser.add_argument(
+        flag, dest=f"_{name}_flag", default=None, help=argparse.SUPPRESS
+    )
+
+
+def resolve_id_args(args):
+    """Resolve positional-or-flag ID arguments after parsing.
+
+    For each _<name>_flag attribute, merges with the positional <name>:
+    - If flag provided, use it
+    - If positional provided, use it
+    - If both provided, error
+    - If neither provided, error with helpful message
+    """
+    flag_attrs = [a for a in vars(args) if a.endswith("_flag") and a.startswith("_")]
+    for flag_attr in flag_attrs:
+        base_attr = flag_attr[1:-5]  # strip _ prefix and _flag suffix
+        flag_val = getattr(args, flag_attr)
+        pos_val = getattr(args, base_attr, None)
+        flag_name = f"--{base_attr.replace('_', '-')}"
+
+        if flag_val is not None and pos_val is not None:
+            error(f"Provide {base_attr} as positional or {flag_name}, not both")
+
+        if flag_val is not None:
+            setattr(args, base_attr, flag_val)
+        elif pos_val is None:
+            error(f"Missing required argument: {base_attr} (positional or {flag_name})")
+
+        delattr(args, flag_attr)
 
 
 def output(data, pretty=False):

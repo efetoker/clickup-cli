@@ -1,7 +1,7 @@
 """Space command handlers — list, get, statuses."""
 
 from ..config import WORKSPACE_ID
-from ..helpers import resolve_space_id
+from ..helpers import resolve_space_id, add_id_argument
 
 
 def register_parser(subparsers, F):
@@ -73,9 +73,7 @@ examples:
   clickup spaces get 901810200000
   clickup --pretty spaces get <space>""",
     )
-    sg.add_argument(
-        "space", type=str, help="Space name (from config) or raw space ID"
-    )
+    add_id_argument(sg, "space", "Space name (from config) or raw space ID")
 
     # spaces statuses
     ss = spaces_sub.add_parser(
@@ -103,9 +101,7 @@ notes:
   Accepts a configured space name or raw space ID.
   Statuses can only be modified via the ClickUp UI, not the API.""",
     )
-    ss.add_argument(
-        "space", type=str, help="Space name (from config) or raw space ID"
-    )
+    add_id_argument(ss, "space", "Space name (from config) or raw space ID")
 
 
 def cmd_spaces_list(client, args):

@@ -21,6 +21,7 @@ from clickup_cli.helpers import (
     compact_task,
     format_tasks,
     read_content,
+    resolve_id_args,
     resolve_space_id,
 )
 
@@ -820,7 +821,7 @@ class EntrypointTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(result.returncode, 0)
-        self.assertIn("1.1.3", result.stdout)
+        self.assertIn("1.2.0", result.stdout)
 
 
 class ConfigFallbackTests(unittest.TestCase):
@@ -924,6 +925,153 @@ class PreCreateDedupTests(unittest.TestCase):
         args = self._make_args(name="Unique task")
         result = cmd_tasks_create(client, args)
         self.assertEqual(result["id"], "new456")
+
+
+class FlagAliasTests(unittest.TestCase):
+    """Tests for positional-or-flag argument aliases."""
+
+    def setUp(self):
+        self.parser = cli.build_parser()
+
+    def _parse(self, argv):
+        args = self.parser.parse_args(cli.normalize_cli_argv(argv))
+        resolve_id_args(args)
+        return args
+
+    # -- flag form works --
+
+    def test_tasks_get_flag_form(self):
+        args = self._parse(["tasks", "get", "--task-id", "abc123"])
+        self.assertEqual(args.task_id, "abc123")
+
+    def test_tasks_search_query_flag(self):
+        args = self._parse(["tasks", "search", "--query", "login bug"])
+        self.assertEqual(args.query, "login bug")
+
+    def test_comments_add_task_id_flag(self):
+        args = self._parse(["comments", "add", "--task-id", "xyz", "--text", "hi"])
+        self.assertEqual(args.task_id, "xyz")
+
+    def test_comments_update_comment_id_flag(self):
+        args = self._parse(["comments", "update", "--comment-id", "c1", "--text", "fix"])
+        self.assertEqual(args.comment_id, "c1")
+
+    def test_docs_get_page_both_flags(self):
+        args = self._parse(["docs", "get-page", "--doc-id", "d1", "--page-id", "p1"])
+        self.assertEqual(args.doc_id, "d1")
+        self.assertEqual(args.page_id, "p1")
+
+    def test_folders_get_flag_form(self):
+        args = self._parse(["folders", "get", "--folder-id", "f123"])
+        self.assertEqual(args.folder_id, "f123")
+
+    def test_lists_get_flag_form(self):
+        args = self._parse(["lists", "get", "--list-id", "l456"])
+        self.assertEqual(args.list_id, "l456")
+
+    def test_spaces_get_flag_form(self):
+        args = self._parse(["spaces", "get", "--space", "personal"])
+        self.assertEqual(args.space, "personal")
+
+    def test_tags_add_flag_form(self):
+        args = self._parse(["tags", "add", "--task-id", "t1", "--tag", "urgent"])
+        self.assertEqual(args.task_id, "t1")
+
+    # -- positional still works (regression) --
+
+    def test_tasks_get_positional_still_works(self):
+        args = self._parse(["tasks", "get", "abc123"])
+        self.assertEqual(args.task_id, "abc123")
+
+    def test_tasks_search_positional_still_works(self):
+        args = self._parse(["tasks", "search", "bug", "--space", "jump"])
+        self.assertEqual(args.query, "bug")
+
+    # -- both provided errors --
+
+    def test_tasks_get_both_forms_errors(self):
+        with self.assertRaises(SystemExit):
+            self._parse(["tasks", "get", "abc", "--task-id", "def"])
+
+    # -- neither provided errors --
+
+    def test_tasks_get_missing_errors(self):
+        with self.assertRaises(SystemExit):
+            self._parse(["tasks", "get"])
+
+    # -- _flag attrs are cleaned up --
+
+    def test_flag_attrs_cleaned_after_resolve(self):
+        args = self._parse(["tasks", "get", "--task-id", "abc123"])
+        self.assertFalse(hasattr(args, "_task_id_flag"))
+
+
+class SpaceInferenceTests(unittest.TestCase):
+    """Tests for auto-inferring --space from --list via API lookup."""
+
+    def test_tasks_create_infers_space_from_list(self):
+        """When --list provided without --space, space is inferred via API."""
+        client = FakeClient(dry_run=True)
+        original_get = client.get_v2
+
+        def mock_get(path, params=None, allow_dry_run=False):
+            if path.startswith("/list/"):
+                return {"space": {"id": "901810236409"}}
+            return original_get(path, params, allow_dry_run)
+
+        client.get_v2 = mock_get
+        args = Namespace(
+            space=None,
+            list_id="901816702978",
+            name="Test",
+            desc=None,
+            desc_file=None,
+            good_as_is=False,
+            priority=None,
+            status=None,
+            no_assign=False,
+            skip_dedup=False,
+        )
+        result = cmd_tasks_create(client, args)
+        self.assertTrue(result["dry_run"])
+        self.assertIsNotNone(args.space)
+
+    def test_tasks_create_errors_without_space_or_list(self):
+        """When neither --space nor --list provided, errors with helpful message."""
+        client = FakeClient(dry_run=True)
+        args = Namespace(
+            space=None,
+            list_id=None,
+            name="Test",
+            desc=None,
+            desc_file=None,
+            good_as_is=False,
+            priority=None,
+            status=None,
+            no_assign=False,
+            skip_dedup=False,
+        )
+        with self.assertRaises(SystemExit):
+            cmd_tasks_create(client, args)
+
+    def test_tasks_create_space_still_works(self):
+        """Explicit --space still works as before."""
+        client = FakeClient(dry_run=True)
+        args = Namespace(
+            space="personal",
+            list_id=None,
+            name="Test",
+            desc=None,
+            desc_file=None,
+            good_as_is=False,
+            priority=None,
+            status=None,
+            no_assign=False,
+            skip_dedup=False,
+        )
+        result = cmd_tasks_create(client, args)
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(args.space, "personal")
 
 
 if __name__ == "__main__":

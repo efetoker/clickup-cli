@@ -1,6 +1,6 @@
 """Tag command handlers — list, add, remove."""
 
-from ..helpers import resolve_space_id
+from ..helpers import resolve_space_id, add_id_argument
 
 
 def register_parser(subparsers, F):
@@ -73,7 +73,7 @@ examples:
   clickup tags add abc123 --tag "in review"
   clickup --dry-run tags add abc123 --tag "draft" """,
     )
-    tga.add_argument("task_id", type=str, help="ClickUp task ID")
+    add_id_argument(tga, "task_id", "ClickUp task ID")
     tga.add_argument(
         "--tag", required=True, type=str, help="Tag name to add (auto-lowercased)"
     )
@@ -99,7 +99,7 @@ examples:
   clickup tags remove abc123 --tag "draft"
   clickup --dry-run tags remove abc123 --tag "in review" """,
     )
-    tgr.add_argument("task_id", type=str, help="ClickUp task ID")
+    add_id_argument(tgr, "task_id", "ClickUp task ID")
     tgr.add_argument(
         "--tag", required=True, type=str, help="Tag name to remove (auto-lowercased)"
     )

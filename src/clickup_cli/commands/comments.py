@@ -1,6 +1,6 @@
 """Comment command handlers — list, add, update, delete, thread, reply."""
 
-from ..helpers import read_content, error, fetch_all_comments
+from ..helpers import read_content, error, fetch_all_comments, add_id_argument
 
 
 def register_parser(subparsers, F):
@@ -46,7 +46,7 @@ examples:
   clickup comments list abc123 --all
   clickup --pretty comments list abc123""",
     )
-    cl.add_argument("task_id", type=str, help="ClickUp task ID")
+    add_id_argument(cl, "task_id", "ClickUp task ID")
     cl.add_argument(
         "--all",
         action="store_true",
@@ -81,7 +81,7 @@ examples:
 notes:
   --text and --file are mutually exclusive. Using both is an error.""",
     )
-    ca.add_argument("task_id", type=str, help="ClickUp task ID")
+    add_id_argument(ca, "task_id", "ClickUp task ID")
     ca.add_argument(
         "--text", type=str, help="Inline comment text (mutually exclusive with --file)"
     )
@@ -117,7 +117,7 @@ notes:
   --text and --file are mutually exclusive. Using both is an error.
   --resolve and --unresolve are mutually exclusive.""",
     )
-    cu.add_argument("comment_id", type=str, help="ClickUp comment ID")
+    add_id_argument(cu, "comment_id", "ClickUp comment ID")
     cu.add_argument(
         "--text", type=str, help="New comment text (mutually exclusive with --file)"
     )
@@ -159,7 +159,7 @@ examples:
   clickup --dry-run comments delete 456
   clickup comments delete 456""",
     )
-    cd.add_argument("comment_id", type=str, help="ClickUp comment ID to delete")
+    add_id_argument(cd, "comment_id", "ClickUp comment ID to delete")
 
     # comments thread
     ct = comments_sub.add_parser(
@@ -179,7 +179,7 @@ examples:
   clickup comments thread 456
   clickup --pretty comments thread 456""",
     )
-    ct.add_argument("comment_id", type=str, help="Parent comment ID")
+    add_id_argument(ct, "comment_id", "Parent comment ID")
 
     # comments reply
     cr = comments_sub.add_parser(
@@ -206,7 +206,7 @@ examples:
 notes:
   --text and --file are mutually exclusive. Using both is an error.""",
     )
-    cr.add_argument("comment_id", type=str, help="Parent comment ID to reply to")
+    add_id_argument(cr, "comment_id", "Parent comment ID to reply to")
     cr.add_argument(
         "--text", type=str, help="Inline reply text (mutually exclusive with --file)"
     )

@@ -1,7 +1,7 @@
 """Doc command handlers — list, get, create, pages, get-page, edit-page, create-page."""
 
 from ..config import WORKSPACE_ID, SPACES
-from ..helpers import read_content, error
+from ..helpers import read_content, error, add_id_argument
 
 
 def register_parser(subparsers, F):
@@ -80,7 +80,7 @@ examples:
   clickup docs get doc_abc123
   clickup --pretty docs get doc_abc123""",
     )
-    dg.add_argument("doc_id", type=str, help="ClickUp doc ID")
+    add_id_argument(dg, "doc_id", "ClickUp doc ID")
 
     # docs create
     dc = docs_sub.add_parser(
@@ -153,7 +153,7 @@ notes:
   Always run this before get-page or edit-page if you do not already
   have the page ID. Using the doc ID as a page ID will fail.""",
     )
-    dp.add_argument("doc_id", type=str, help="ClickUp doc ID")
+    add_id_argument(dp, "doc_id", "ClickUp doc ID")
 
     # docs get-page
     dgp = docs_sub.add_parser(
@@ -180,8 +180,8 @@ notes:
   Default format is markdown (md). Use --format plain for plain text.
   Page ID must come from 'docs pages', not from the doc ID itself.""",
     )
-    dgp.add_argument("doc_id", type=str, help="ClickUp doc ID")
-    dgp.add_argument("page_id", type=str, help="Page ID (from 'docs pages')")
+    add_id_argument(dgp, "doc_id", "ClickUp doc ID")
+    add_id_argument(dgp, "page_id", "Page ID (from 'docs pages')")
     dgp.add_argument(
         "--format",
         choices=["md", "plain"],
@@ -228,8 +228,8 @@ notes:
   Does not support: deleting pages (not available in the ClickUp API).
   Use 'docs pages' to find the correct page ID before editing.""",
     )
-    dep.add_argument("doc_id", type=str, help="ClickUp doc ID")
-    dep.add_argument("page_id", type=str, help="Page ID (from 'docs pages')")
+    add_id_argument(dep, "doc_id", "ClickUp doc ID")
+    add_id_argument(dep, "page_id", "Page ID (from 'docs pages')")
     dep.add_argument(
         "--content",
         type=str,
@@ -278,7 +278,7 @@ notes:
   write to that page instead of creating a duplicate.
   Does not support: deleting pages (not available in the ClickUp API).""",
     )
-    dcp.add_argument("doc_id", type=str, help="ClickUp doc ID")
+    add_id_argument(dcp, "doc_id", "ClickUp doc ID")
     dcp.add_argument("--name", required=True, help="Page name (required)")
     dcp.add_argument(
         "--content",

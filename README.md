@@ -44,6 +44,8 @@ This CLI is designed to be used by AI coding agents (Claude Code, Codex, etc.) a
 - Every command has detailed `--help` — agents can self-discover usage
 - `--dry-run` on all mutations — agents can preview before acting
 - `--pretty` for readable output during debugging
+- **Flag aliases for all positional args** — agents can use `--task-id`, `--query`, `--doc-id`, `--comment-id` etc. instead of positional arguments (both forms work)
+- **Auto-infer `--space` from `--list`** — `tasks create --list 12345 --name "Fix bug"` works without `--space`
 
 **Plug-and-play skill file:** Copy `.claude/skills/clickup-cli.md` from this repo into your project's `.claude/skills/` directory. It teaches Claude Code how to use the CLI: command discovery, safety patterns, common workflows.
 
@@ -89,6 +91,8 @@ clickup tasks list --space <name> --pretty
 
 ## Key Behaviors
 
+- **Flag aliases** — every positional argument also accepts a `--flag` form. `tasks get abc123` and `tasks get --task-id abc123` are equivalent. Same for `--query`, `--doc-id`, `--page-id`, `--folder-id`, `--list-id`, `--comment-id`, `--space`.
+- **`tasks create`** auto-infers `--space` from `--list` via API lookup. You can omit `--space` if `--list` is provided.
 - **`tasks get`** auto-fetches comments and appends them to the output. Use `--no-comments` to skip.
 - **`tasks search`** auto-detects task ID patterns like `PROJ-39` and applies prefix filtering.
 - **`tasks create`** checks for duplicates before creating. Use `--skip-dedup` to bypass.
