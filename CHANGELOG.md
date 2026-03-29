@@ -2,6 +2,8 @@
 
 ## 1.2.0 (2026-03-29)
 
+**First PyPI release** — `pip install clickup-cli`
+
 - Accept flag aliases for all positional arguments — agents can now use `--task-id`, `--query`, `--doc-id`, `--page-id`, `--folder-id`, `--list-id`, `--comment-id`, `--space` instead of positional args. Both forms work; positional args are unchanged for backwards compatibility.
 - Auto-infer `--space` from `--list` on `tasks create` — when `--list` is provided without `--space`, the CLI fetches the list metadata via API to resolve its parent space automatically. Eliminates the most common agent error (12+ failures in 3 days).
 - Make `--space` optional on `tasks create` (was required) — now only required if `--list` is also absent.

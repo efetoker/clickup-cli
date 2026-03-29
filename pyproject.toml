@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"
 authors = [
-    { name = "Efe Toker" },
+    { name = "Efe Toker", email = "efetoker@gmail.com" },
 ]
 keywords = ["clickup", "cli", "api", "ai-agent", "task-management"]
 classifiers = [
@@ -24,7 +24,8 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Topic :: Software Development :: Libraries",
+    "Topic :: Utilities",
+    "Topic :: Office/Business :: Scheduling",
 ]
 dependencies = [
     "requests>=2.20",
@@ -41,6 +42,7 @@ clickup = "clickup_cli.cli:main"
 Homepage = "https://github.com/efetoker/clickup-cli"
 Repository = "https://github.com/efetoker/clickup-cli"
 Issues = "https://github.com/efetoker/clickup-cli/issues"
+Changelog = "https://github.com/efetoker/clickup-cli/releases"
 
 [tool.hatch.version]
 path = "src/clickup_cli/__init__.py"
