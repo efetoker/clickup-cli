@@ -54,7 +54,26 @@ When adding new commands with ID arguments, always use `add_id_argument()` inste
 pip install -e ".[dev]"
 pytest -v
 ruff check src/ tests/
+scripts/validate-cli-output.sh   # verify JSON stdout contract
 ```
+
+## Test Structure
+
+```
+tests/
+├── conftest.py       # test config setup (runs at import time, before clickup_cli loads)
+├── test_cli.py       # argument parsing, dispatch, global flags, resolve_id_args
+├── test_client.py    # ClickUpClient: rate limiting, dry-run, debug mode, HTTP methods
+├── test_commands.py  # all command handlers: tasks, comments, docs, folders, lists, spaces, tags, team
+├── test_config.py    # config loading: file, env vars, fallback chain, workspace auto-detect
+└── test_helpers.py   # output/error helpers, compact_task, add_id_argument, fetch_all_comments pagination
+```
+
+305 tests, all using `unittest.TestCase` + `FakeClient` pattern (no real HTTP calls).
+
+## CI
+
+GitHub Actions (`ci.yml`): lint + test on Python 3.9, 3.11, 3.13. Runs on push to main and PRs.
 
 ## Adding a New Command
 
@@ -74,3 +93,24 @@ ruff check src/ tests/
 - Stdout is always JSON. Errors and warnings go to stderr.
 - Every mutation supports `--dry-run`
 - Config is lazy-loaded — the `init` command works without any config file
+
+## Automations
+
+Hooks, skills, and subagents in `.claude/`:
+
+**Hooks** (`settings.json`):
+- PostToolUse: ruff auto-lint/format on `.py` edits
+- PostToolUse: auto-run affected test file on source edits
+- PreToolUse: block `.env`/`.pem`/`.key`/credentials edits
+- PreToolUse: block `pyproject.toml` edits (requires explicit approval)
+
+**Skills** (`skills/`):
+- `add-command` — step-by-step workflow for adding new CLI commands
+- `clickup-cli` — usage guide for the CLI itself
+- `release` — version bump, build, PyPI publish workflow
+- `validate-output` — verify JSON stdout contract across all commands
+- `changelog` — generate categorized release notes from git log
+
+**Subagents** (`agents/`):
+- `test-writer` — generate pytest tests following existing patterns
+- `api-compatibility-checker` — cross-ref CLI endpoints against ClickUp API docs
