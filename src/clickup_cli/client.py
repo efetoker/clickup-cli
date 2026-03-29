@@ -53,11 +53,13 @@ class ClickUpClient:
         if kwargs.get("json"):
             self._log(f"  body: {_json.dumps(kwargs['json'], ensure_ascii=False)}")
 
-        try:
-            response = self.session.request(method, url, **kwargs)
-        except requests.ConnectionError:
-            error("Couldn't reach ClickUp API — check your network connection")
+        def _do_request():
+            try:
+                return self.session.request(method, url, **kwargs)
+            except requests.ConnectionError:
+                error("Couldn't reach ClickUp API — check your network connection")
 
+        response = _do_request()
         self._log(f"  → {response.status_code} ({len(response.text)} bytes)")
 
         if response.status_code == 429:
@@ -66,10 +68,7 @@ class ClickUpClient:
                 wait = max(0, int(reset) - int(time.time())) + 1
                 print(f"Rate limited (429), waiting {wait}s...", file=sys.stderr)
                 time.sleep(wait)
-                try:
-                    response = self.session.request(method, url, **kwargs)
-                except requests.ConnectionError:
-                    error("Couldn't reach ClickUp API — check your network connection")
+                response = _do_request()
 
         if response.status_code == 401:
             error(

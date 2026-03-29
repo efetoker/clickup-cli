@@ -464,6 +464,14 @@ def _parse_fields(args):
     return [f.strip() for f in raw.split(",") if f.strip()]
 
 
+def _format_and_wrap(tasks, args):
+    """Format tasks and wrap in standard response dict."""
+    fields = _parse_fields(args)
+    full = getattr(args, "full", False)
+    formatted = format_tasks(tasks, full=full, fields=fields)
+    return {"tasks": formatted, "count": len(formatted)}
+
+
 def _resolve_priority(priority_arg):
     """Resolve a priority name or number to the API integer value."""
     if priority_arg is None:
@@ -516,11 +524,7 @@ def cmd_tasks_list(client, args):
         params["subtasks"] = "true"
 
     all_tasks = _paginate_tasks(client, f"/list/{list_id}/task", params)
-
-    fields = _parse_fields(args)
-    full = getattr(args, "full", False)
-    formatted = format_tasks(all_tasks, full=full, fields=fields)
-    return {"tasks": formatted, "count": len(formatted)}
+    return _format_and_wrap(all_tasks, args)
 
 
 def cmd_tasks_get(client, args):
@@ -687,10 +691,7 @@ def cmd_tasks_search(client, args):
             if task.get("name", "").startswith(name_prefix)
         ]
 
-    fields = _parse_fields(args)
-    full = getattr(args, "full", False)
-    formatted = format_tasks(all_tasks, full=full, fields=fields)
-    return {"tasks": formatted, "count": len(formatted)}
+    return _format_and_wrap(all_tasks, args)
 
 
 def cmd_tasks_delete(client, args):

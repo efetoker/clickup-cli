@@ -4,6 +4,7 @@ import argparse
 import os
 import sys
 
+from . import __version__
 from .client import ClickUpClient
 from .helpers import output, error, resolve_id_args
 
@@ -85,7 +86,7 @@ Use <group> --help for details on each group.""",
     parser.add_argument(
         "--version",
         action="version",
-        version=f"%(prog)s {_get_version()}",
+        version=f"%(prog)s {__version__}",
     )
 
     subparsers = parser.add_subparsers(dest="group", required=True)
@@ -133,11 +134,6 @@ examples:
     tags_register(subparsers, F)
 
     return parser
-
-
-def _get_version():
-    from . import __version__
-    return __version__
 
 
 def dispatch(client, args):

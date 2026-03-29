@@ -113,19 +113,20 @@ def cmd_tags_list(client, args):
     return {"tags": tags, "count": len(tags)}
 
 
-def cmd_tags_add(client, args):
-    """Add a tag to a task."""
+def _tag_action(client, args, method, dry_action, done_action):
+    """Shared logic for tag add/remove."""
     tag_name = args.tag.lower()
     if client.dry_run:
-        return {"dry_run": True, "action": "add_tag", "task_id": args.task_id, "tag": tag_name}
-    client.post_v2(f"/task/{args.task_id}/tag/{tag_name}", data={})
-    return {"status": "ok", "action": "tag_added", "task_id": args.task_id, "tag": tag_name}
+        return {"dry_run": True, "action": dry_action, "task_id": args.task_id, "tag": tag_name}
+    method(f"/task/{args.task_id}/tag/{tag_name}", **({"data": {}} if method == client.post_v2 else {}))
+    return {"status": "ok", "action": done_action, "task_id": args.task_id, "tag": tag_name}
+
+
+def cmd_tags_add(client, args):
+    """Add a tag to a task."""
+    return _tag_action(client, args, client.post_v2, "add_tag", "tag_added")
 
 
 def cmd_tags_remove(client, args):
     """Remove a tag from a task."""
-    tag_name = args.tag.lower()
-    if client.dry_run:
-        return {"dry_run": True, "action": "remove_tag", "task_id": args.task_id, "tag": tag_name}
-    client.delete_v2(f"/task/{args.task_id}/tag/{tag_name}")
-    return {"status": "ok", "action": "tag_removed", "task_id": args.task_id, "tag": tag_name}
+    return _tag_action(client, args, client.delete_v2, "remove_tag", "tag_removed")

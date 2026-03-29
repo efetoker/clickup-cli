@@ -189,19 +189,23 @@ examples:
     add_id_argument(ld, "list_id", "ClickUp list ID to delete")
 
 
-def cmd_lists_list(client, args):
-    """List lists in a folder or folderless lists in a space."""
+def _resolve_list_parent(args):
+    """Resolve folder or space target for list operations."""
     if args.folder:
-        resp = client.get_v2(f"/folder/{args.folder}/list")
-        lists = resp.get("lists", [])
-        return {"lists": lists, "count": len(lists)}
+        return f"/folder/{args.folder}/list", {"folder_id": args.folder}
     elif args.space:
         space_id = resolve_space_id(args.space)
-        resp = client.get_v2(f"/space/{space_id}/list")
-        lists = resp.get("lists", [])
-        return {"lists": lists, "count": len(lists)}
+        return f"/space/{space_id}/list", {"space_id": space_id}
     else:
         error("Provide either --folder <folder_id> or --space <name|id>")
+
+
+def cmd_lists_list(client, args):
+    """List lists in a folder or folderless lists in a space."""
+    path, _ = _resolve_list_parent(args)
+    resp = client.get_v2(path)
+    lists = resp.get("lists", [])
+    return {"lists": lists, "count": len(lists)}
 
 
 def cmd_lists_get(client, args):
@@ -217,15 +221,7 @@ def cmd_lists_create(client, args):
     if args.status:
         body["status"] = args.status
 
-    if args.folder:
-        endpoint = f"/folder/{args.folder}/list"
-        target = {"folder_id": args.folder}
-    elif args.space:
-        space_id = resolve_space_id(args.space)
-        endpoint = f"/space/{space_id}/list"
-        target = {"space_id": space_id}
-    else:
-        error("Provide either --folder <folder_id> or --space <name|id>")
+    endpoint, target = _resolve_list_parent(args)
 
     if client.dry_run:
         return {"dry_run": True, "action": "create_list", **target, "body": body}

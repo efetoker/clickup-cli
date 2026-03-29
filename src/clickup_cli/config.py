@@ -13,6 +13,8 @@ import json
 import os
 import sys
 
+from .helpers import error
+
 _config_cache = None
 
 
@@ -31,22 +33,18 @@ def _auto_detect_workspace(token):
             "https://api.clickup.com/api/v2/team", headers=headers, timeout=15
         )
     except requests.ConnectionError:
-        print("Error: Could not reach ClickUp API to auto-detect workspace", file=sys.stderr)
-        sys.exit(1)
+        error("Could not reach ClickUp API to auto-detect workspace")
 
     if resp.status_code == 401:
-        print("Error: Authentication failed — check your API token", file=sys.stderr)
-        sys.exit(1)
+        error("Authentication failed — check your API token")
 
     if not resp.ok:
-        print(f"Error: API error {resp.status_code} while detecting workspace: {resp.text}", file=sys.stderr)
-        sys.exit(1)
+        error(f"API error {resp.status_code} while detecting workspace: {resp.text}")
 
     teams = resp.json().get("teams", [])
 
     if not teams:
-        print("Error: No workspaces found for this token", file=sys.stderr)
-        sys.exit(1)
+        error("No workspaces found for this token")
 
     if len(teams) == 1:
         workspace_id = str(teams[0]["id"])
@@ -57,12 +55,11 @@ def _auto_detect_workspace(token):
         return workspace_id
 
     # Multiple workspaces — can't auto-select
-    lines = ["Error: Multiple workspaces found — set workspace_id manually:"]
+    lines = ["Multiple workspaces found — set workspace_id manually:"]
     for t in teams:
         lines.append(f"  {t['name']}: {t['id']}")
     lines.append("\nSet it in your config file or via: export CLICKUP_WORKSPACE_ID=<id>")
-    print("\n".join(lines), file=sys.stderr)
-    sys.exit(1)
+    error("\n".join(lines))
 
 
 def _save_field_to_config(path, field, value):
@@ -86,11 +83,7 @@ def _find_config_path():
     if env_path:
         if os.path.exists(env_path):
             return env_path
-        print(
-            f"Error: CLICKUP_CONFIG_PATH points to a missing file: {env_path}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        error(f"CLICKUP_CONFIG_PATH points to a missing file: {env_path}")
 
     # 2. XDG-ish default
     xdg_path = os.path.expanduser("~/.config/clickup-cli/config.json")
@@ -111,8 +104,7 @@ def _load_from_file(path):
         try:
             config = json.load(f)
         except json.JSONDecodeError as e:
-            print(f"Error: Invalid JSON in {path}: {e}", file=sys.stderr)
-            sys.exit(1)
+            error(f"Invalid JSON in {path}: {e}")
 
     # Allow env var to override token from file
     env_token = os.environ.get("CLICKUP_API_TOKEN")
@@ -120,12 +112,10 @@ def _load_from_file(path):
         config["api_token"] = env_token
 
     if not config.get("api_token"):
-        print(
-            f"Error: Missing required field in {path}: api_token\n"
-            "See clickup-config.example.json for the expected schema.",
-            file=sys.stderr,
+        error(
+            f"Missing required field in {path}: api_token\n"
+            "See clickup-config.example.json for the expected schema."
         )
-        sys.exit(1)
 
     # Auto-detect workspace_id if missing
     if not config.get("workspace_id"):
@@ -170,8 +160,8 @@ def load_config():
         _config_cache = env_config
         return _config_cache
 
-    print(
-        "Error: No ClickUp configuration found.\n\n"
+    error(
+        "No ClickUp configuration found.\n\n"
         "Set up with one of:\n"
         "  clickup init                          # interactive setup\n"
         "  clickup init --token pk_YOUR_TOKEN    # non-interactive setup\n\n"
@@ -180,10 +170,8 @@ def load_config():
         "  2. Fill in your API token and workspace ID\n\n"
         "Or set environment variables:\n"
         "  export CLICKUP_API_TOKEN=pk_YOUR_TOKEN\n"
-        "  export CLICKUP_WORKSPACE_ID=YOUR_WORKSPACE_ID",
-        file=sys.stderr,
+        "  export CLICKUP_WORKSPACE_ID=YOUR_WORKSPACE_ID"
     )
-    sys.exit(1)
 
 
 def _reset():

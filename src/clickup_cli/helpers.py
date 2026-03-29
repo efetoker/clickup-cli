@@ -51,10 +51,7 @@ def resolve_id_args(args):
 
 def output(data, pretty=False):
     """Print JSON to stdout."""
-    if pretty:
-        print(json.dumps(data, indent=2, ensure_ascii=False))
-    else:
-        print(json.dumps(data, ensure_ascii=False))
+    print(json.dumps(data, indent=2 if pretty else None, ensure_ascii=False))
 
 
 def error(msg):
@@ -91,18 +88,16 @@ def resolve_space_id(space_arg):
 
 def fetch_all_comments(client, task_id):
     """Fetch all comments for a task, paginating through all pages."""
-    resp = client.get_v2(f"/task/{task_id}/comment")
-    comments = resp.get("comments", [])
-    all_comments = list(comments)
-    page_size = len(comments)
-    while page_size > 0 and len(comments) >= page_size:
-        last = comments[-1]
-        params = {"start": str(last["date"]), "start_id": last["id"]}
+    all_comments = []
+    params = None
+    while True:
         resp = client.get_v2(f"/task/{task_id}/comment", params=params)
         comments = resp.get("comments", [])
         if not comments:
             break
         all_comments.extend(comments)
+        last = comments[-1]
+        params = {"start": str(last["date"]), "start_id": last["id"]}
     return all_comments
 
 
