@@ -1,5 +1,9 @@
 # clickup-cli
 
+[![PyPI version](https://img.shields.io/pypi/v/clickup-cli)](https://pypi.org/project/clickup-cli/)
+[![Python versions](https://img.shields.io/pypi/pyversions/clickup-cli)](https://pypi.org/project/clickup-cli/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 The missing ClickUp CLI. Built for developers and AI agents.
 
 There's no official ClickUp CLI. If you're a developer who lives in the terminal, or an AI agent that needs structured data from ClickUp, this fills the gap. JSON stdout, errors to stderr, dry-run on every mutation.
