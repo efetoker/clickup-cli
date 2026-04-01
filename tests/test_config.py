@@ -308,18 +308,6 @@ class LazyAttrTests(unittest.TestCase):
         from clickup_cli import config
         self.assertEqual(config.DEFAULT_TAGS, [])
 
-    def test_draft_tag(self):
-        from clickup_cli import config
-        self.assertEqual(config.DRAFT_TAG, "draft")
-
-    def test_good_as_is_tag(self):
-        from clickup_cli import config
-        self.assertEqual(config.GOOD_AS_IS_TAG, "good as is")
-
-    def test_default_priority(self):
-        from clickup_cli import config
-        self.assertEqual(config.DEFAULT_PRIORITY, 4)
-
     def test_unknown_attr_raises(self):
         from clickup_cli import config
         with self.assertRaises(AttributeError):

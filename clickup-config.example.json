@@ -5,8 +5,5 @@
   "spaces": {
     "myspace": {"space_id": "SPACE_ID", "list_id": "DEFAULT_LIST_ID"}
   },
-  "default_tags": [],
-  "draft_tag": "draft",
-  "good_as_is_tag": "good as is",
-  "default_priority": 4
+  "default_tags": []
 }

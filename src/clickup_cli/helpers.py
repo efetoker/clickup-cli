@@ -8,8 +8,7 @@ import sys
 def add_id_argument(parser, name, help_text):
     """Add an argument that accepts both positional and --flag forms.
 
-    Agents naturally use flag forms (--task-id) while humans prefer positional.
-    This adds both so either style works.
+    This adds both so either style works (e.g. `command abc123` or `command --task-id abc123`).
 
     Example:
         add_id_argument(parser, 'task_id', 'ClickUp task ID')

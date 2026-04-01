@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "filepath=\"$TOOL_INPUT_FILE_PATH$TOOL_INPUT_file_path\"; if echo \"$filepath\" | grep -qE 'src/clickup_cli/commands/[a-z]+\\.py$'; then ~/Library/Python/3.9/bin/pytest tests/test_commands.py -x -q --tb=short 2>&1 | tail -5; elif echo \"$filepath\" | grep -qE 'src/clickup_cli/(cli|helpers|config|client)\\.py$'; then mod=$(basename \"$filepath\" .py); if [ -f \"tests/test_${mod}.py\" ]; then ~/Library/Python/3.9/bin/pytest \"tests/test_${mod}.py\" -x -q --tb=short 2>&1 | tail -5; fi; fi; true"
+            "command": "filepath=\"$TOOL_INPUT_FILE_PATH$TOOL_INPUT_file_path\"; if echo \"$filepath\" | grep -qE 'src/clickup_cli/commands/[a-z]+\\.py$'; then python -m pytest tests/test_commands.py -x -q --tb=short 2>&1 | tail -5; elif echo \"$filepath\" | grep -qE 'src/clickup_cli/(cli|helpers|config|client)\\.py$'; then mod=$(basename \"$filepath\" .py); if [ -f \"tests/test_${mod}.py\" ]; then python -m pytest \"tests/test_${mod}.py\" -x -q --tb=short 2>&1 | tail -5; fi; fi; true"
           }
         ]
       }

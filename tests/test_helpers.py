@@ -142,8 +142,8 @@ class ResolveSpaceIdTests(unittest.TestCase):
         # conftest sets up testspace -> space_id 111
         self.assertEqual(resolve_space_id("testspace"), "111")
 
-    def test_config_name_personal(self):
-        self.assertEqual(resolve_space_id("personal"), "333")
+    def test_config_name_dev(self):
+        self.assertEqual(resolve_space_id("dev"), "333")
 
     def test_unknown_non_numeric_errors(self):
         with self.assertRaises(SystemExit):

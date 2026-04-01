@@ -5,7 +5,7 @@ import sys
 
 import requests
 
-from ..config import WORKSPACE_ID, SPACES, USER_ID, DEFAULT_TAGS, DRAFT_TAG, GOOD_AS_IS_TAG, DEFAULT_PRIORITY
+from ..config import WORKSPACE_ID, SPACES, DEFAULT_TAGS
 from ..helpers import read_content, error, format_tasks, fetch_all_comments, add_id_argument
 
 
@@ -66,7 +66,9 @@ Use --subtasks to include nested child tasks in the results. Without it,
 only top-level tasks are returned (ClickUp API default).
 
 Use this when you need to see all tasks, optionally filtered by status
-or including closed tasks.""",
+or including closed tasks.
+
+Use --tag to filter by tag name (API-level filtering, exact match).""",
         epilog="""\
 returns:
   {"tasks": [...], "count": N}
@@ -78,6 +80,7 @@ examples:
   clickup tasks list --space <name> --include-closed
   clickup tasks list --space <name> --status "in progress"
   clickup tasks list --space <name> --subtasks
+  clickup tasks list --space <name> --tag "created by claude"
 
 notes:
   Output is compact by default (id, name, status, priority, url).
@@ -113,6 +116,13 @@ notes:
         "--subtasks",
         action="store_true",
         help="Include subtasks (nested child tasks) in results",
+    )
+    tl.add_argument(
+        "--tag",
+        type=str,
+        action="append",
+        dest="tags",
+        help="Filter by tag name (repeatable, API-level, auto-lowercased)",
     )
     tl.add_argument(
         "--fields",
@@ -172,8 +182,6 @@ Create a new task in a list. This is a mutating command.
 By default, the task is created in the space's default list. Use --list
 to target a specific list instead (e.g. one inside a folder).
 
-Tags are applied automatically based on config (default_tags, draft_tag).
-
 Use --desc for inline text or --desc-file for file-based content.
 Do not use both at the same time.
 
@@ -190,16 +198,13 @@ examples:
   clickup tasks create --space <name> --name "Fix bug" --desc "Details here"
   clickup tasks create --space <name> --list 12345 --name "In folder list"
   clickup tasks create --space <name> --name "Read article" --desc-file notes.md
-  clickup --dry-run tasks create --space <name> --name "Test" --good-as-is
 
 notes:
   --space is always required (to resolve target list). --list is optional.
   If --list is given, the task is created in that list instead of the
   space's default list.
   --desc and --desc-file are mutually exclusive. Using both is an error.
-  --good-as-is marks the task as intentionally simple (no draft tag).
-  --no-assign skips the default assignee.
-  --priority defaults to the value in your config (default: low).
+  --assign assigns the task to a user ID.
   Does not support: checklists, custom fields, attachments, or due dates.""",
     )
     tc.add_argument(
@@ -232,17 +237,11 @@ notes:
         type=str,
         help="Priority: urgent, high, normal, low (default: from config)",
     )
-    tc.add_argument("--no-assign", action="store_true", help="Skip default assignee")
     tc.add_argument(
-        "--good-as-is",
-        action="store_true",
-        help="Mark task as intentionally simple (no draft tag)",
-    )
-    tc.add_argument(
-        "--skip-dedup",
-        action="store_true",
-        default=False,
-        help="Skip duplicate check and create the task even if one with the same name exists",
+        "--assign",
+        type=str,
+        dest="assign_user",
+        help="Assign to a user ID",
     )
 
     # tasks update
@@ -355,6 +354,13 @@ notes:
         help="Keep only tasks whose name starts with this prefix (client-side filter)",
     )
     ts.add_argument(
+        "--tag",
+        type=str,
+        action="append",
+        dest="tags",
+        help="Filter by tag name (repeatable, client-side, auto-lowercased)",
+    )
+    ts.add_argument(
         "--fields",
         type=str,
         help="Comma-separated list of fields to return per task (e.g. id,name,status,url)",
@@ -452,7 +458,7 @@ examples:
 
 PRIORITY_MAP = {"urgent": 1, "high": 2, "normal": 3, "low": 4}
 
-# Pattern for task ID queries like PER-39, JMP-12, MTM-8
+# Pattern for task ID queries like PROJ-39, BUG-12
 _TASK_ID_PATTERN = re.compile(r"^[A-Z]+-\d+$")
 
 
@@ -510,6 +516,15 @@ def _paginate_tasks(client, path, params):
     return all_tasks
 
 
+def _filter_by_tags(tasks, tag_names):
+    """Client-side filter: keep tasks that have ALL specified tags."""
+    required = {t.lower() for t in tag_names}
+    return [
+        t for t in tasks
+        if required <= {tg.get("name", "").lower() for tg in t.get("tags", [])}
+    ]
+
+
 def cmd_tasks_list(client, args):
     list_id = _resolve_list_id(args)
     if client.dry_run:
@@ -522,6 +537,10 @@ def cmd_tasks_list(client, args):
         params["statuses[]"] = args.status
     if args.subtasks:
         params["subtasks"] = "true"
+    tag_filter = getattr(args, "tags", None)
+    if tag_filter:
+        for tag in tag_filter:
+            params["tags[]"] = tag.lower()
 
     all_tasks = _paginate_tasks(client, f"/list/{list_id}/task", params)
     return _format_and_wrap(all_tasks, args)
@@ -585,14 +604,14 @@ def cmd_tasks_create(client, args):
     desc = read_content(args.desc, args.desc_file, "--desc")
 
     tags = list(DEFAULT_TAGS)  # copy to avoid mutating config
-    if args.good_as_is:
-        tags.append(GOOD_AS_IS_TAG)
-    elif not desc:
-        tags.append(DRAFT_TAG)
 
-    priority = _resolve_priority(args.priority) if args.priority else DEFAULT_PRIORITY
+    body = {"name": args.name}
 
-    body = {"name": args.name, "tags": tags, "priority": priority}
+    if tags:
+        body["tags"] = tags
+
+    if args.priority:
+        body["priority"] = _resolve_priority(args.priority)
 
     if desc:
         body["markdown_description"] = desc
@@ -600,10 +619,9 @@ def cmd_tasks_create(client, args):
     if args.status:
         body["status"] = args.status
 
-    if not args.no_assign:
-        user_id = USER_ID
-        if user_id:
-            body["assignees"] = [int(user_id)]
+    assign_user = getattr(args, "assign_user", None)
+    if assign_user:
+        body["assignees"] = [int(assign_user)]
 
     if client.dry_run:
         return {
@@ -612,26 +630,6 @@ def cmd_tasks_create(client, args):
             "space": args.space,
             "list_id": list_id,
         }
-
-    # Pre-create duplicate search
-    if not getattr(args, "skip_dedup", False):
-        search_resp = client.get_v2(
-            f"/team/{WORKSPACE_ID}/task",
-            params={"search": args.name, "list_ids[]": list_id},
-        )
-        existing = [
-            t for t in search_resp.get("tasks", [])
-            if t.get("name", "").lower() == args.name.lower()
-        ]
-        if existing:
-            match = existing[0]
-            print(
-                f"warning: found existing task with same name: "
-                f"{match.get('id')} — {match.get('url', 'no url')}",
-                file=sys.stderr,
-            )
-            match["duplicate_of"] = match["id"]
-            return match
 
     return client.post_v2(f"/list/{list_id}/task", data=body)
 
@@ -660,7 +658,7 @@ def cmd_tasks_search(client, args):
     if client.dry_run:
         return {"dry_run": True, "action": "search_tasks", "query": args.query}
 
-    # Auto-apply --name-prefix when query looks like a task ID (e.g. PER-39)
+    # Auto-apply --name-prefix when query looks like a task ID (e.g. PROJ-39)
     name_prefix = getattr(args, "name_prefix", None)
     if not name_prefix and _TASK_ID_PATTERN.match(args.query):
         name_prefix = args.query
@@ -690,6 +688,10 @@ def cmd_tasks_search(client, args):
             for task in all_tasks
             if task.get("name", "").startswith(name_prefix)
         ]
+
+    tag_filter = getattr(args, "tags", None)
+    if tag_filter:
+        all_tasks = _filter_by_tags(all_tasks, tag_filter)
 
     return _format_and_wrap(all_tasks, args)
 

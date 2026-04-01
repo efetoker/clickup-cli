@@ -765,7 +765,7 @@ class TeamWhoamiTests(unittest.TestCase):
                         "name": "Test WS",
                         "color": "#fff",
                         "members": [
-                            {"user": {"id": 1, "username": "efe", "email": "e@e.com",
+                            {"user": {"id": 1, "username": "testuser", "email": "test@example.com",
                                       "role_key": "admin", "initials": "ET"}}
                         ],
                     }
@@ -776,7 +776,7 @@ class TeamWhoamiTests(unittest.TestCase):
         result = cmd_team_whoami(client, args)
         self.assertEqual(result["workspace"]["id"], "test_workspace")
         self.assertEqual(result["member_count"], 1)
-        self.assertEqual(result["members"][0]["username"], "efe")
+        self.assertEqual(result["members"][0]["username"], "testuser")
 
     def test_whoami_fallback_to_first_team(self):
         """When workspace_id doesn't match, falls back to first team."""
@@ -845,7 +845,7 @@ class TasksGetTests(unittest.TestCase):
         client.get_v2.side_effect = [
             {"id": "t1", "name": "Task"},  # GET /task/t1
             {"comments": [
-                {"id": "c1", "comment_text": "Hello", "user": {"username": "efe"}, "date": "1000"}
+                {"id": "c1", "comment_text": "Hello", "user": {"username": "testuser"}, "date": "1000"}
             ]},  # GET /task/t1/comment (first call)
             {"comments": []},  # GET /task/t1/comment (pagination check)
         ]
@@ -853,7 +853,7 @@ class TasksGetTests(unittest.TestCase):
         result = cmd_tasks_get(client, args)
         self.assertEqual(result["id"], "t1")
         self.assertEqual(result["comment_count"], 1)
-        self.assertEqual(result["comments"][0]["user"], "efe")
+        self.assertEqual(result["comments"][0]["user"], "testuser")
 
     def test_get_no_comments_flag(self):
         client = MagicMock()
@@ -973,62 +973,50 @@ class TasksUpdateBehaviorTests(unittest.TestCase):
             cmd_tasks_update(client, args)
 
 
-class TasksCreateTagLogicTests(unittest.TestCase):
+class TasksCreateBehaviorTests(unittest.TestCase):
 
-    def test_draft_tag_added_when_no_description(self):
-        client = FlexClient(dry_run=True)
-        args = Namespace(space="testspace", list_id=None, name="Task",
-                         desc=None, desc_file=None, good_as_is=False,
-                         priority=None, status=None, no_assign=False,
-                         skip_dedup=False)
-        result = cmd_tasks_create(client, args)
-        self.assertIn("draft", result["body"]["tags"])
+    def _make_args(self, **overrides):
+        defaults = dict(space="testspace", list_id=None, name="Task",
+                        desc=None, desc_file=None,
+                        priority=None, status=None, assign_user=None)
+        defaults.update(overrides)
+        return Namespace(**defaults)
 
-    def test_good_as_is_tag_replaces_draft(self):
+    def test_no_priority_when_unset(self):
         client = FlexClient(dry_run=True)
-        args = Namespace(space="testspace", list_id=None, name="Task",
-                         desc=None, desc_file=None, good_as_is=True,
-                         priority=None, status=None, no_assign=False,
-                         skip_dedup=False)
+        args = self._make_args()
         result = cmd_tasks_create(client, args)
-        self.assertIn("good as is", result["body"]["tags"])
-        self.assertNotIn("draft", result["body"]["tags"])
-
-    def test_no_draft_when_description_present(self):
-        client = FlexClient(dry_run=True)
-        args = Namespace(space="testspace", list_id=None, name="Task",
-                         desc="Has a desc", desc_file=None, good_as_is=False,
-                         priority=None, status=None, no_assign=False,
-                         skip_dedup=False)
-        result = cmd_tasks_create(client, args)
-        self.assertNotIn("draft", result["body"]["tags"])
+        self.assertNotIn("priority", result["body"])
 
     def test_priority_from_arg(self):
         client = FlexClient(dry_run=True)
-        args = Namespace(space="testspace", list_id=None, name="Task",
-                         desc=None, desc_file=None, good_as_is=False,
-                         priority="high", status=None, no_assign=False,
-                         skip_dedup=False)
+        args = self._make_args(priority="high")
         result = cmd_tasks_create(client, args)
         self.assertEqual(result["body"]["priority"], 2)
 
-    def test_no_assign_skips_assignee(self):
+    def test_assign_user(self):
         client = FlexClient(dry_run=True)
-        args = Namespace(space="testspace", list_id=None, name="Task",
-                         desc=None, desc_file=None, good_as_is=False,
-                         priority=None, status=None, no_assign=True,
-                         skip_dedup=False)
+        args = self._make_args(assign_user="99999")
+        result = cmd_tasks_create(client, args)
+        self.assertEqual(result["body"]["assignees"], [99999])
+
+    def test_no_assignee_by_default(self):
+        client = FlexClient(dry_run=True)
+        args = self._make_args()
         result = cmd_tasks_create(client, args)
         self.assertNotIn("assignees", result["body"])
 
     def test_status_set_in_body(self):
         client = FlexClient(dry_run=True)
-        args = Namespace(space="testspace", list_id=None, name="Task",
-                         desc=None, desc_file=None, good_as_is=False,
-                         priority=None, status="in progress", no_assign=False,
-                         skip_dedup=False)
+        args = self._make_args(status="in progress")
         result = cmd_tasks_create(client, args)
         self.assertEqual(result["body"]["status"], "in progress")
+
+    def test_no_tags_when_default_tags_empty(self):
+        client = FlexClient(dry_run=True)
+        args = self._make_args()
+        result = cmd_tasks_create(client, args)
+        self.assertNotIn("tags", result["body"])
 
 
 class TasksSearchBehaviorTests(unittest.TestCase):
@@ -1038,19 +1026,19 @@ class TasksSearchBehaviorTests(unittest.TestCase):
         client = FlexClient(responses={
             "/task": {
                 "tasks": [
-                    {"name": "PER-39: Real task", "status": {"status": "open"}, "priority": None, "id": "t1", "url": "u"},
-                    {"name": "Something else PER-39", "status": {"status": "open"}, "priority": None, "id": "t2", "url": "u"},
+                    {"name": "PROJ-39: Real task", "status": {"status": "open"}, "priority": None, "id": "t1", "url": "u"},
+                    {"name": "Something else PROJ-39", "status": {"status": "open"}, "priority": None, "id": "t2", "url": "u"},
                 ],
                 "last_page": True,
             }
         })
-        args = Namespace(query="PER-39", include_closed=False, space=None,
+        args = Namespace(query="PROJ-39", include_closed=False, space=None,
                          list_id=None, folder_id=None, name_prefix=None,
                          fields=None, full=False)
         result = cmd_tasks_search(client, args)
-        # Only the task starting with PER-39 should remain
+        # Only the task starting with PROJ-39 should remain
         self.assertEqual(result["count"], 1)
-        self.assertTrue(result["tasks"][0]["name"].startswith("PER-39"))
+        self.assertTrue(result["tasks"][0]["name"].startswith("PROJ-39"))
 
     def test_space_scoping(self):
         client = FlexClient(responses={
@@ -1084,6 +1072,58 @@ class TasksSearchBehaviorTests(unittest.TestCase):
         cmd_tasks_search(client, args)
         params = client.calls[0]["params"]
         self.assertEqual(params["project_ids[]"], "f123")
+
+
+# ─── Tag Filtering ───────────────────────────────────────────────────────
+
+
+class TagFilterTests(unittest.TestCase):
+
+    def test_search_filters_by_tag(self):
+        client = FlexClient(responses={
+            "/task": {
+                "tasks": [
+                    {"name": "Has tag", "id": "t1", "status": {"status": "open"},
+                     "priority": None, "url": "u",
+                     "tags": [{"name": "important"}]},
+                    {"name": "No tag", "id": "t2", "status": {"status": "open"},
+                     "priority": None, "url": "u",
+                     "tags": []},
+                ],
+                "last_page": True,
+            }
+        })
+        args = Namespace(query="tag", include_closed=False, space=None,
+                         list_id=None, folder_id=None, name_prefix=None,
+                         tags=["important"], fields=None, full=False)
+        result = cmd_tasks_search(client, args)
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["tasks"][0]["name"], "Has tag")
+
+    def test_search_tag_filter_is_case_insensitive(self):
+        client = FlexClient(responses={
+            "/task": {
+                "tasks": [
+                    {"name": "Tagged", "id": "t1", "status": {"status": "open"},
+                     "priority": None, "url": "u",
+                     "tags": [{"name": "Created By Claude"}]},
+                ],
+                "last_page": True,
+            }
+        })
+        args = Namespace(query="tag", include_closed=False, space=None,
+                         list_id=None, folder_id=None, name_prefix=None,
+                         tags=["created by claude"], fields=None, full=False)
+        result = cmd_tasks_search(client, args)
+        self.assertEqual(result["count"], 1)
+
+    def test_list_passes_tags_as_api_param(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(space="testspace", list_id=None, include_closed=False,
+                         status=None, subtasks=False, tags=["urgent"],
+                         fields=None, full=False)
+        result = cmd_tasks_list(client, args)
+        self.assertTrue(result["dry_run"])
 
 
 # ─── CLI dispatch ─────────────────────────────────────────────────────────
@@ -1185,7 +1225,7 @@ class InitTokenFlagTests(unittest.TestCase):
         mock_team_resp.json.return_value = {
             "teams": [{
                 "id": "ws1", "name": "TestWS",
-                "members": [{"user": {"id": "u1", "username": "efe"}}]
+                "members": [{"user": {"id": "u1", "username": "testuser"}}]
             }]
         }
 
@@ -1288,7 +1328,7 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
     def test_single_workspace_auto_selects(self, mock_get):
         """Single workspace is auto-selected without prompting."""
         team = {"id": "ws1", "name": "MyWS",
-                "members": [{"user": {"id": "u1", "username": "efe"}}]}
+                "members": [{"user": {"id": "u1", "username": "testuser"}}]}
         mock_get.side_effect = [
             self._make_team_response([team]),
             self._make_spaces_response(),
@@ -1307,7 +1347,7 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
     def test_multiple_workspaces_prompts_selection(self, mock_get):
         """Multiple workspaces prompts user for selection."""
         teams = [
-            {"id": "ws1", "name": "WS1", "members": [{"user": {"id": "u1", "username": "efe"}}]},
+            {"id": "ws1", "name": "WS1", "members": [{"user": {"id": "u1", "username": "testuser"}}]},
             {"id": "ws2", "name": "WS2", "members": []},
         ]
         mock_get.side_effect = [
@@ -1349,7 +1389,7 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
     def test_spaces_fetched_and_config_written(self, mock_get):
         """Spaces are fetched and included in the config file."""
         team = {"id": "ws1", "name": "MyWS",
-                "members": [{"user": {"id": "u1", "username": "efe"}}]}
+                "members": [{"user": {"id": "u1", "username": "testuser"}}]}
 
         spaces_resp = self._make_spaces_response([
             {"id": "s1", "name": "Personal"},

@@ -187,9 +187,6 @@ _ATTR_MAP = {
     "USER_ID": lambda c: c.get("user_id", ""),
     "SPACES": lambda c: c.get("spaces", {}),
     "DEFAULT_TAGS": lambda c: c.get("default_tags", []),
-    "DRAFT_TAG": lambda c: c.get("draft_tag", "draft"),
-    "GOOD_AS_IS_TAG": lambda c: c.get("good_as_is_tag", "good as is"),
-    "DEFAULT_PRIORITY": lambda c: c.get("default_priority", 4),
 }
 
 

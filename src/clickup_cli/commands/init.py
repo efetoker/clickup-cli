@@ -132,9 +132,6 @@ def cmd_init(args):
         "user_id": user_id,
         "spaces": spaces,
         "default_tags": [],
-        "draft_tag": "draft",
-        "good_as_is_tag": "good as is",
-        "default_priority": 4,
     }
 
     # Write config

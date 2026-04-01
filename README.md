@@ -99,7 +99,6 @@ clickup tasks list --space <name> --pretty
 - **`tasks create`** auto-infers `--space` from `--list` via API lookup. You can omit `--space` if `--list` is provided.
 - **`tasks get`** auto-fetches comments and appends them to the output. Use `--no-comments` to skip.
 - **`tasks search`** auto-detects task ID patterns like `PROJ-39` and applies prefix filtering.
-- **`tasks create`** checks for duplicates before creating. Use `--skip-dedup` to bypass.
 - **`docs edit-page --append`** reads the current page content, appends your new content, and sends one update.
 - **Tag names** are auto-lowercased (ClickUp API stores them lowercase regardless of UI display).
 - **Doc ID ≠ page ID.** Always use `docs pages <doc_id>` to discover page IDs before using `get-page` or `edit-page`.
@@ -118,10 +117,7 @@ clickup tasks list --space <name> --pretty
   "spaces": {
     "myspace": {"space_id": "111", "list_id": "222"}
   },
-  "default_tags": [],
-  "draft_tag": "draft",
-  "good_as_is_tag": "good as is",
-  "default_priority": 4
+  "default_tags": []
 }
 ```
 

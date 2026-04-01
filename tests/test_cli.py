@@ -51,35 +51,35 @@ class FakeClient:
 
 class CliArgumentTests(unittest.TestCase):
     def test_normalize_cli_argv_moves_global_flags_to_front(self):
-        argv = ["tasks", "search", "JMP", "--pretty", "--dry-run", "--space", "jump"]
+        argv = ["tasks", "search", "PROJ", "--pretty", "--dry-run", "--space", "staging"]
 
         normalized = cli.normalize_cli_argv(argv)
 
         self.assertEqual(
             normalized,
-            ["--pretty", "--dry-run", "tasks", "search", "JMP", "--space", "jump"],
+            ["--pretty", "--dry-run", "tasks", "search", "PROJ", "--space", "staging"],
         )
 
     def test_parser_accepts_pretty_after_subcommand_when_normalized(self):
         parser = cli.build_parser()
 
         args = parser.parse_args(
-            cli.normalize_cli_argv(["tasks", "list", "--space", "jump", "--pretty"])
+            cli.normalize_cli_argv(["tasks", "list", "--space", "staging", "--pretty"])
         )
 
         self.assertTrue(args.pretty)
         self.assertEqual(args.group, "tasks")
         self.assertEqual(args.command, "list")
-        self.assertEqual(args.space, "jump")
+        self.assertEqual(args.space, "staging")
 
     def test_normalize_cli_argv_deduplicates_repeated_global_flags(self):
-        argv = ["tasks", "list", "--pretty", "--space", "jump", "--pretty", "--dry-run"]
+        argv = ["tasks", "list", "--pretty", "--space", "staging", "--pretty", "--dry-run"]
 
         normalized = cli.normalize_cli_argv(argv)
 
         self.assertEqual(
             normalized,
-            ["--pretty", "--dry-run", "tasks", "list", "--space", "jump"],
+            ["--pretty", "--dry-run", "tasks", "list", "--space", "staging"],
         )
 
     def test_parser_accepts_init_command(self):
@@ -100,27 +100,27 @@ class TaskSearchTests(unittest.TestCase):
             task_pages=[
                 {
                     "tasks": [
-                        {"name": "JMP-9: WOS-18 Perf work"},
-                        {"name": "JMP-19: Another task"},
-                        {"name": "prefix JMP-9 in middle"},
+                        {"name": "PROJ-9: Performance optimization"},
+                        {"name": "PROJ-19: Another task"},
+                        {"name": "prefix PROJ-9 in middle"},
                     ],
                     "last_page": True,
                 }
             ]
         )
         args = Namespace(
-            query="JMP",
+            query="PROJ",
             include_closed=False,
             space=None,
             list_id=None,
             folder_id=None,
-            name_prefix="JMP-9",
+            name_prefix="PROJ-9",
         )
 
         result = cmd_tasks_search(client, args)
 
         self.assertEqual(result["count"], 1)
-        self.assertEqual(result["tasks"][0]["name"], "JMP-9: WOS-18 Perf work")
+        self.assertEqual(result["tasks"][0]["name"], "PROJ-9: Performance optimization")
 
 
 class DocsEditPageTests(unittest.TestCase):
@@ -313,21 +313,20 @@ class DryRunTests(unittest.TestCase):
     def test_tasks_create_dry_run(self):
         client = self._make_fake_client()
         args = Namespace(
-            space="jump",
+            space="staging",
             name="Test task",
             desc="A description",
             desc_file=None,
-            good_as_is=False,
             priority=None,
             status=None,
-            no_assign=False,
+            assign_user=None,
             list_id=None,
         )
 
         result = cmd_tasks_create(client, args)
 
         self.assertTrue(result["dry_run"])
-        self.assertEqual(result["space"], "jump")
+        self.assertEqual(result["space"], "staging")
         self.assertIn("name", result["body"])
         self.assertEqual(result["body"]["name"], "Test task")
 
@@ -374,7 +373,7 @@ class DryRunTests(unittest.TestCase):
 
     def test_folders_create_dry_run(self):
         client = self._make_fake_client()
-        args = Namespace(space="jump", name="New Folder")
+        args = Namespace(space="staging", name="New Folder")
 
         result = cmd_folders_create(client, args)
 
@@ -484,8 +483,8 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.command, "list")
 
     def test_docs_list_with_space(self):
-        args = self._parse(["docs", "list", "--space", "personal"])
-        self.assertEqual(args.space, "personal")
+        args = self._parse(["docs", "list", "--space", "dev"])
+        self.assertEqual(args.space, "dev")
 
     def test_docs_get(self):
         args = self._parse(["docs", "get", "doc_abc"])
@@ -493,7 +492,7 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.doc_id, "doc_abc")
 
     def test_docs_create(self):
-        args = self._parse(["docs", "create", "--space", "personal", "--name", "My doc"])
+        args = self._parse(["docs", "create", "--space", "dev", "--name", "My doc"])
         self.assertEqual(args.command, "create")
         self.assertEqual(args.name, "My doc")
 
@@ -545,7 +544,7 @@ class ParserComprehensiveTests(unittest.TestCase):
     # --- folders ---
 
     def test_folders_list(self):
-        args = self._parse(["folders", "list", "--space", "personal"])
+        args = self._parse(["folders", "list", "--space", "dev"])
         self.assertEqual(args.group, "folders")
         self.assertEqual(args.command, "list")
 
@@ -555,7 +554,7 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.folder_id, "f123")
 
     def test_folders_create(self):
-        args = self._parse(["folders", "create", "--space", "personal", "--name", "Sprint 1"])
+        args = self._parse(["folders", "create", "--space", "dev", "--name", "Sprint 1"])
         self.assertEqual(args.command, "create")
         self.assertEqual(args.name, "Sprint 1")
 
@@ -583,7 +582,7 @@ class ParserComprehensiveTests(unittest.TestCase):
     # --- tags ---
 
     def test_tags_list(self):
-        args = self._parse(["tags", "list", "--space", "personal"])
+        args = self._parse(["tags", "list", "--space", "dev"])
         self.assertEqual(args.group, "tags")
         self.assertEqual(args.command, "list")
 
@@ -600,7 +599,7 @@ class ParserComprehensiveTests(unittest.TestCase):
     # --- tasks (additional to existing) ---
 
     def test_tasks_list(self):
-        args = self._parse(["tasks", "list", "--space", "jump"])
+        args = self._parse(["tasks", "list", "--space", "staging"])
         self.assertEqual(args.group, "tasks")
         self.assertEqual(args.command, "list")
 
@@ -614,7 +613,7 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertTrue(args.no_comments)
 
     def test_tasks_create(self):
-        args = self._parse(["tasks", "create", "--space", "jump", "--name", "Bug"])
+        args = self._parse(["tasks", "create", "--space", "staging", "--name", "Bug"])
         self.assertEqual(args.command, "create")
         self.assertEqual(args.name, "Bug")
 
@@ -628,9 +627,9 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.command, "delete")
 
     def test_tasks_move(self):
-        args = self._parse(["tasks", "move", "abc123", "--to", "personal"])
+        args = self._parse(["tasks", "move", "abc123", "--to", "dev"])
         self.assertEqual(args.command, "move")
-        self.assertEqual(args.to_list, "personal")
+        self.assertEqual(args.to_list, "dev")
 
     def test_tasks_merge(self):
         args = self._parse(["tasks", "merge", "abc123", "--sources", "d,e"])
@@ -638,7 +637,7 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.source_ids, "d,e")
 
     def test_tasks_search(self):
-        args = self._parse(["tasks", "search", "bug", "--space", "jump", "--full"])
+        args = self._parse(["tasks", "search", "bug", "--space", "staging", "--full"])
         self.assertEqual(args.command, "search")
         self.assertTrue(args.full)
 
@@ -709,7 +708,7 @@ class TasksListPaginationTests(unittest.TestCase):
             ]
         )
         args = Namespace(
-            space="jump", list_id=None, include_closed=False, status=None,
+            space="staging", list_id=None, include_closed=False, status=None,
             subtasks=False, fields=None, full=False,
         )
         result = cmd_tasks_list(client, args)
@@ -736,7 +735,7 @@ class TasksListPaginationTests(unittest.TestCase):
             ]
         )
         args = Namespace(
-            space="jump", list_id=None, include_closed=False, status=None,
+            space="staging", list_id=None, include_closed=False, status=None,
             subtasks=False, fields=None, full=False,
         )
         result = cmd_tasks_list(client, args)
@@ -757,7 +756,7 @@ class TasksListPaginationTests(unittest.TestCase):
             ]
         )
         args = Namespace(
-            space="jump", list_id=None, include_closed=False, status=None,
+            space="staging", list_id=None, include_closed=False, status=None,
             subtasks=False, fields=None, full=True,
         )
         result = cmd_tasks_list(client, args)
@@ -821,7 +820,7 @@ class EntrypointTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(result.returncode, 0)
-        self.assertIn("1.2.0", result.stdout)
+        self.assertIn("1.3.0", result.stdout)
 
 
 class ConfigFallbackTests(unittest.TestCase):
@@ -866,65 +865,26 @@ class ConfigFallbackTests(unittest.TestCase):
 
 
 class PreCreateDedupTests(unittest.TestCase):
-    def _make_args(self, name="Test task", space="personal", skip_dedup=False):
+    def _make_args(self, name="Test task", space="dev"):
         return Namespace(
             name=name,
             space=space,
             list_id=None,
             desc=None,
             desc_file=None,
-            good_as_is=False,
             priority=None,
             status=None,
-            no_assign=False,
-            skip_dedup=skip_dedup,
+            assign_user=None,
         )
 
-    def test_tasks_create_finds_duplicate(self):
-        """When a task with the same name exists, return it instead of creating."""
+    def test_tasks_create_posts_to_api(self):
+        """Create task sends POST to the correct list endpoint."""
         client = FakeClient(dry_run=False)
-        original_get = client.get_v2
-        def mock_get(path, params=None, allow_dry_run=False):
-            if "/team/" in path and params and "search" in params:
-                return {"tasks": [{"id": "abc123", "name": "Test task", "url": "https://..."}]}
-            return original_get(path, params, allow_dry_run)
-        client.get_v2 = mock_get
+        client.post_v2 = lambda path, data=None: {"id": "new123", "name": data["name"]}
 
         args = self._make_args(name="Test task")
         result = cmd_tasks_create(client, args)
-        self.assertEqual(result["duplicate_of"], "abc123")
-
-    def test_tasks_create_skip_dedup_bypasses_search(self):
-        """With --skip-dedup, no search is performed."""
-        client = FakeClient(dry_run=False)
-        search_called = []
-        original_get = client.get_v2
-        def mock_get(path, params=None, allow_dry_run=False):
-            if "/team/" in path:
-                search_called.append(True)
-            return original_get(path, params, allow_dry_run)
-        client.get_v2 = mock_get
-        client.post_v2 = lambda path, data=None: {"id": "new123", "name": data["name"]}
-
-        args = self._make_args(name="Test task", skip_dedup=True)
-        result = cmd_tasks_create(client, args)
-        self.assertEqual(len(search_called), 0)
         self.assertEqual(result["id"], "new123")
-
-    def test_tasks_create_no_duplicate_proceeds(self):
-        """When no duplicate found, create normally."""
-        client = FakeClient(dry_run=False)
-        original_get = client.get_v2
-        def mock_get(path, params=None, allow_dry_run=False):
-            if "/team/" in path and params and "search" in params:
-                return {"tasks": []}
-            return original_get(path, params, allow_dry_run)
-        client.get_v2 = mock_get
-        client.post_v2 = lambda path, data=None: {"id": "new456", "name": data["name"]}
-
-        args = self._make_args(name="Unique task")
-        result = cmd_tasks_create(client, args)
-        self.assertEqual(result["id"], "new456")
 
 
 class FlagAliasTests(unittest.TestCase):
@@ -970,8 +930,8 @@ class FlagAliasTests(unittest.TestCase):
         self.assertEqual(args.list_id, "l456")
 
     def test_spaces_get_flag_form(self):
-        args = self._parse(["spaces", "get", "--space", "personal"])
-        self.assertEqual(args.space, "personal")
+        args = self._parse(["spaces", "get", "--space", "dev"])
+        self.assertEqual(args.space, "dev")
 
     def test_tags_add_flag_form(self):
         args = self._parse(["tags", "add", "--task-id", "t1", "--tag", "urgent"])
@@ -984,7 +944,7 @@ class FlagAliasTests(unittest.TestCase):
         self.assertEqual(args.task_id, "abc123")
 
     def test_tasks_search_positional_still_works(self):
-        args = self._parse(["tasks", "search", "bug", "--space", "jump"])
+        args = self._parse(["tasks", "search", "bug", "--space", "staging"])
         self.assertEqual(args.query, "bug")
 
     # -- both provided errors --
@@ -1016,21 +976,19 @@ class SpaceInferenceTests(unittest.TestCase):
 
         def mock_get(path, params=None, allow_dry_run=False):
             if path.startswith("/list/"):
-                return {"space": {"id": "901810236409"}}
+                return {"space": {"id": "100200300"}}
             return original_get(path, params, allow_dry_run)
 
         client.get_v2 = mock_get
         args = Namespace(
             space=None,
-            list_id="901816702978",
+            list_id="400500600",
             name="Test",
             desc=None,
             desc_file=None,
-            good_as_is=False,
             priority=None,
             status=None,
-            no_assign=False,
-            skip_dedup=False,
+            assign_user=None,
         )
         result = cmd_tasks_create(client, args)
         self.assertTrue(result["dry_run"])
@@ -1045,11 +1003,9 @@ class SpaceInferenceTests(unittest.TestCase):
             name="Test",
             desc=None,
             desc_file=None,
-            good_as_is=False,
             priority=None,
             status=None,
-            no_assign=False,
-            skip_dedup=False,
+            assign_user=None,
         )
         with self.assertRaises(SystemExit):
             cmd_tasks_create(client, args)
@@ -1058,20 +1014,18 @@ class SpaceInferenceTests(unittest.TestCase):
         """Explicit --space still works as before."""
         client = FakeClient(dry_run=True)
         args = Namespace(
-            space="personal",
+            space="dev",
             list_id=None,
             name="Test",
             desc=None,
             desc_file=None,
-            good_as_is=False,
             priority=None,
             status=None,
-            no_assign=False,
-            skip_dedup=False,
+            assign_user=None,
         )
         result = cmd_tasks_create(client, args)
         self.assertTrue(result["dry_run"])
-        self.assertEqual(args.space, "personal")
+        self.assertEqual(args.space, "dev")
 
 
 class MainFunctionTests(unittest.TestCase):

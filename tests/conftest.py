@@ -12,13 +12,10 @@ _test_config = {
     "user_id": "12345",
     "spaces": {
         "testspace": {"space_id": "111", "list_id": "222"},
-        "personal": {"space_id": "333", "list_id": "444"},
-        "jump": {"space_id": "555", "list_id": "666"},
+        "dev": {"space_id": "333", "list_id": "444"},
+        "staging": {"space_id": "555", "list_id": "666"},
     },
     "default_tags": [],
-    "draft_tag": "draft",
-    "good_as_is_tag": "good as is",
-    "default_priority": 4,
 }
 
 _test_dir = tempfile.mkdtemp()
