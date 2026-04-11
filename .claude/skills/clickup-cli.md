@@ -94,6 +94,17 @@ clickup lists list --folder <folder_id>
 clickup spaces statuses <space_name>
 ```
 
+### Toggle privacy on a space, folder, or list
+```bash
+clickup spaces privacy <space_name> --private
+clickup folders privacy <folder_id> --public
+clickup lists privacy <list_id> --private
+clickup --dry-run lists privacy <list_id> --private  # preview body
+```
+Each command requires exactly one of `--private` / `--public`. This flips the
+private/public boolean only — granular member or guest grants must be done in
+the ClickUp UI. Hits the v3 ACLs endpoint.
+
 ## Configuration
 
 The CLI loads config from (in order):
