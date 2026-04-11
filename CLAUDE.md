@@ -14,7 +14,7 @@ src/clickup_cli/
 ├── helpers.py       # output(), error(), compact_task(), etc.
 └── commands/
     ├── __init__.py  # HANDLERS dict
-    ├── tasks.py     # tasks parser + handlers (list/get/create/update/search/delete/move/merge)
+    ├── tasks.py     # tasks parser + handlers (list/get/create/update/search/delete/move/merge/depend)
     ├── comments.py  # comments parser + handlers (list/add/update/delete/thread/reply)
     ├── docs.py      # docs parser + handlers (list/get/create/pages/get-page/edit-page/create-page)
     ├── folders.py   # folders parser + handlers (list/get/create/update/delete)

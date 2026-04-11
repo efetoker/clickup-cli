@@ -48,6 +48,29 @@ clickup --dry-run tasks create --space <space_name> --name "Fix auth" --desc "De
 clickup tasks create --space <space_name> --name "Fix auth" --desc "Details"
 ```
 
+### Update a task (including tags, assignees, custom fields)
+```bash
+clickup tasks update <task_id> --status "in progress"
+clickup tasks update <task_id> --add-tag urgent --remove-tag draft
+clickup tasks update <task_id> --add-assignee <user_id>
+clickup tasks update <task_id> --custom-field <field_uuid>=high
+clickup --dry-run tasks update <task_id> --add-tag urgent  # returns a plan
+```
+
+### Manage task dependencies
+```bash
+clickup tasks depend add <task_id> --depends-on <blocker_task_id>
+clickup tasks depend add <task_id> --depended-on-by <blocked_task_id>
+clickup tasks depend list <task_id>
+clickup tasks depend remove <task_id> --depends-on <blocker_task_id>
+```
+
+### See archived tasks alongside live ones
+```bash
+clickup tasks list --space <space_name> --include-archived
+clickup tasks search "bug" --include-archived
+```
+
 ### Add a comment
 ```bash
 clickup comments add <task_id> --text "Work complete"

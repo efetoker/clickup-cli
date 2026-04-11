@@ -66,7 +66,7 @@ Output is JSON on stdout; errors go to stderr.
 | Group | Subcommands | Description |
 |-------|-------------|-------------|
 | `init` | — | Interactive workspace setup |
-| `tasks` | list, get, create, update, search, delete, move, merge | Full task CRUD |
+| `tasks` | list, get, create, update, search, delete, move, merge, depend | Full task CRUD + dependencies |
 | `comments` | list, add, update, delete, thread, reply | Full comment CRUD with threading |
 | `docs` | list, get, create, pages, get-page, edit-page, create-page | Docs and page management |
 | `folders` | list, get, create, update, delete | Folder CRUD |
@@ -96,7 +96,12 @@ clickup tasks list --space <name> --pretty
 ## Key Behaviors
 
 - **Flag aliases** — every positional argument also accepts a `--flag` form. `tasks get abc123` and `tasks get --task-id abc123` are equivalent. Same for `--query`, `--doc-id`, `--page-id`, `--folder-id`, `--list-id`, `--comment-id`, `--space`.
+- **Raw numeric IDs** on `--space` and `--folder` flags are accepted transparently alongside config aliases. On tasks commands, a raw space ID resolves to its first folderless list via one API call.
 - **`tasks create`** auto-infers `--space` from `--list` via API lookup. You can omit `--space` if `--list` is provided.
+- **`tasks update`** handles core fields, assignee diffs (`--add-assignee` / `--remove-assignee`), tag diffs (`--add-tag` / `--remove-tag`), and custom fields (`--custom-field FIELD_ID=VALUE`) in one call. All flags are repeatable; `--dry-run` returns a structured plan.
+- **`tasks depend`** — `add`, `remove`, and `list` for task dependencies. Direction required on add/remove via `--depends-on` or `--depended-on-by`.
+- **`tasks list` / `tasks search --include-archived`** — second paginated call with `archived=true`, merged into the default results. Since ClickUp's `archived` param is a filter, this is the only way to see both in one command.
+- **`tasks list --full`** returns `status` as a consistent dict shape (`{status, color, type, orderindex}`). Compact mode and `--fields` continue returning a flat string — one contract per output mode.
 - **`tasks get`** auto-fetches comments and appends them to the output. Use `--no-comments` to skip.
 - **`tasks search`** auto-detects task ID patterns like `PROJ-39` and applies prefix filtering.
 - **`docs edit-page --append`** reads the current page content, appends your new content, and sends one update.
@@ -139,9 +144,9 @@ You can run without a config file by setting just `CLICKUP_API_TOKEN` — the wo
 
 ## Coverage and Gaps
 
-**Covered:** tasks, comments, docs/pages, folders, lists, spaces, tags, team/workspace info.
+**Covered:** tasks (including dependencies and custom field writes), comments, docs/pages, folders, lists, spaces, tags, team/workspace info.
 
-**Not yet covered:** checklists, time tracking, custom fields, task relationships, attachments, goals, webhooks, automations.
+**Not yet covered:** checklists, time tracking, attachments, goals, webhooks, automations.
 
 ## Development Tools
 
