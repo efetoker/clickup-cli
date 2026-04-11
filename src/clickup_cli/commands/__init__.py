@@ -26,7 +26,7 @@ from .folders import (
 )
 from .lists import (
     cmd_lists_list, cmd_lists_get, cmd_lists_create,
-    cmd_lists_update, cmd_lists_delete,
+    cmd_lists_update, cmd_lists_delete, cmd_lists_privacy,
 )
 
 # Keys use f"{args.group}_{args.command}" format from dispatch().
@@ -74,4 +74,5 @@ HANDLERS = {
     "lists_create": cmd_lists_create,
     "lists_update": cmd_lists_update,
     "lists_delete": cmd_lists_delete,
+    "lists_privacy": cmd_lists_privacy,
 }

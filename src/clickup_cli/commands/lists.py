@@ -1,5 +1,6 @@
-"""List command handlers — list, get, create, update, delete."""
+"""List command handlers — list, get, create, update, delete, privacy."""
 
+from ..config import WORKSPACE_ID
 from ..helpers import read_content, error, resolve_space_id, add_id_argument
 
 
@@ -16,11 +17,12 @@ Lists can live directly in a space (folderless) or inside a folder.
 Use --folder or --space to specify the parent depending on the context.
 
 Subcommands:
-  list    — list lists in a folder or folderless lists in a space
-  get     — fetch full details of a list by ID
-  create  — create a new list in a folder or space (mutating)
-  update  — update a list's name, content, or status (mutating)
-  delete  — delete a list (destructive)""",
+  list     — list lists in a folder or folderless lists in a space
+  get      — fetch full details of a list by ID
+  create   — create a new list in a folder or space (mutating)
+  update   — update a list's name, content, or status (mutating)
+  delete   — delete a list (destructive)
+  privacy  — make a list private or public (mutating)""",
         epilog="""\
 examples:
   clickup lists list --folder 12345
@@ -29,7 +31,8 @@ examples:
   clickup --dry-run lists create --folder 12345 --name "Tasks"
   clickup lists create --space <name> --name "Backlog"
   clickup lists update 12345 --name "Renamed list"
-  clickup --dry-run lists delete 12345""",
+  clickup --dry-run lists delete 12345
+  clickup lists privacy 12345 --private""",
     )
     lists_sub = lists_parser.add_subparsers(dest="command", required=True)
 
@@ -196,6 +199,42 @@ examples:
     )
     add_id_argument(ld, "list_id", "ClickUp list ID to delete")
 
+    # lists privacy
+    lp = lists_sub.add_parser(
+        "privacy",
+        formatter_class=F,
+        help="Make a list private or public",
+        description="""\
+Toggle the privacy of a list via the v3 ACLs endpoint. This flips the
+private/public boolean only — it does not grant or revoke individual
+member or guest access. Use the ClickUp UI for granular sharing.
+
+Exactly one of --private or --public is required.
+
+This is a mutating command. Use --dry-run to preview the request body.""",
+        epilog="""\
+returns:
+  {"status": "ok", "action": "set_privacy",
+   "object_type": "list", "object_id": "...", "private": true|false}
+
+examples:
+  clickup lists privacy 12345 --private
+  clickup lists privacy 12345 --public
+  clickup lists privacy --list-id 12345 --private
+  clickup --dry-run lists privacy 12345 --private
+
+notes:
+  Hits PATCH /v3/workspaces/{wid}/list/{id}/acls.""",
+    )
+    add_id_argument(lp, "list_id", "ClickUp list ID")
+    lp_mode = lp.add_mutually_exclusive_group(required=True)
+    lp_mode.add_argument(
+        "--private", action="store_true", help="Make this list private"
+    )
+    lp_mode.add_argument(
+        "--public", action="store_true", help="Make this list public"
+    )
+
 
 def _resolve_list_parent(args):
     """Resolve folder or space target for list operations."""
@@ -264,3 +303,28 @@ def cmd_lists_delete(client, args):
 
     client.delete_v2(f"/list/{args.list_id}")
     return {"status": "ok", "action": "deleted", "list_id": args.list_id}
+
+
+def cmd_lists_privacy(client, args):
+    """Set a list private or public via the v3 ACLs endpoint."""
+    private = bool(args.private)
+    body = {"private": private}
+    path = f"/workspaces/{WORKSPACE_ID}/list/{args.list_id}/acls"
+
+    if client.dry_run:
+        return {
+            "dry_run": True,
+            "action": "set_privacy",
+            "object_type": "list",
+            "object_id": args.list_id,
+            "body": body,
+        }
+
+    client.patch_v3(path, data=body)
+    return {
+        "status": "ok",
+        "action": "set_privacy",
+        "object_type": "list",
+        "object_id": args.list_id,
+        "private": private,
+    }

@@ -38,6 +38,7 @@ from clickup_cli.commands.lists import (
     cmd_lists_delete,
     cmd_lists_get,
     cmd_lists_list,
+    cmd_lists_privacy,
     cmd_lists_update,
 )
 from clickup_cli.commands.spaces import (
@@ -682,6 +683,38 @@ class ListsDeleteTests(unittest.TestCase):
         args = Namespace(list_id="l1")
         result = cmd_lists_delete(client, args)
         self.assertEqual(result["status"], "ok")
+
+
+class ListsPrivacyTests(unittest.TestCase):
+
+    def test_set_private_actual(self):
+        client = FlexClient()
+        args = Namespace(list_id="l1", private=True, public=False)
+        result = cmd_lists_privacy(client, args)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["object_type"], "list")
+        self.assertEqual(result["object_id"], "l1")
+        self.assertTrue(result["private"])
+        call = client.calls[0]
+        self.assertEqual(call["method"], "PATCH_V3")
+        self.assertIn("/workspaces/test_workspace/list/l1/acls", call["path"])
+        self.assertEqual(call["data"], {"private": True})
+
+    def test_set_public_actual(self):
+        client = FlexClient()
+        args = Namespace(list_id="l1", private=False, public=True)
+        result = cmd_lists_privacy(client, args)
+        self.assertFalse(result["private"])
+        self.assertEqual(client.calls[0]["data"], {"private": False})
+
+    def test_dry_run(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(list_id="l1", private=True, public=False)
+        result = cmd_lists_privacy(client, args)
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["object_type"], "list")
+        self.assertEqual(result["body"], {"private": True})
+        self.assertEqual(client.calls, [])
 
 
 # ─── Spaces ───────────────────────────────────────────────────────────────

@@ -607,6 +607,24 @@ class ParserComprehensiveTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self._parse(["folders", "privacy", "f123", "--private", "--public"])
 
+    def test_lists_privacy_private(self):
+        args = self._parse(["lists", "privacy", "l123", "--private"])
+        self.assertEqual(args.command, "privacy")
+        self.assertEqual(args.list_id, "l123")
+        self.assertTrue(args.private)
+
+    def test_lists_privacy_public(self):
+        args = self._parse(["lists", "privacy", "l123", "--public"])
+        self.assertTrue(args.public)
+
+    def test_lists_privacy_requires_mode(self):
+        with self.assertRaises(SystemExit):
+            self._parse(["lists", "privacy", "l123"])
+
+    def test_lists_privacy_rejects_both_modes(self):
+        with self.assertRaises(SystemExit):
+            self._parse(["lists", "privacy", "l123", "--private", "--public"])
+
     # --- team ---
 
     def test_team_whoami(self):
