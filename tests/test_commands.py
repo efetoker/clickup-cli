@@ -1,5 +1,7 @@
 """Tests for all command handlers — behavioral coverage for every command module."""
 
+import contextlib
+import io
 import unittest
 from argparse import Namespace
 from unittest.mock import MagicMock, patch
@@ -1018,6 +1020,17 @@ class TasksCreateBehaviorTests(unittest.TestCase):
         result = cmd_tasks_create(client, args)
         self.assertNotIn("tags", result["body"])
 
+    def test_space_inference_produces_empty_stderr(self):
+        client = FlexClient(
+            dry_run=True,
+            responses={"/list/444": {"space": {"id": "333"}}},
+        )
+        args = self._make_args(space=None, list_id="444")
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            cmd_tasks_create(client, args)
+        self.assertEqual(buf.getvalue(), "")
+
 
 class TasksSearchBehaviorTests(unittest.TestCase):
 
@@ -1035,10 +1048,14 @@ class TasksSearchBehaviorTests(unittest.TestCase):
         args = Namespace(query="PROJ-39", include_closed=False, space=None,
                          list_id=None, folder_id=None, name_prefix=None,
                          fields=None, full=False)
-        result = cmd_tasks_search(client, args)
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            result = cmd_tasks_search(client, args)
         # Only the task starting with PROJ-39 should remain
         self.assertEqual(result["count"], 1)
         self.assertTrue(result["tasks"][0]["name"].startswith("PROJ-39"))
+        # Auto-prefix must be silent (no informational hint on stderr)
+        self.assertEqual(buf.getvalue(), "")
 
     def test_space_scoping(self):
         client = FlexClient(responses={

@@ -593,10 +593,6 @@ def cmd_tasks_create(client, args):
         inferred = _infer_space_from_list(client, args.list_id)
         if inferred:
             args.space = inferred
-            print(
-                f"hint: inferred --space {inferred} from --list {args.list_id}",
-                file=sys.stderr,
-            )
     if not args.space:
         error("--space is required (or provide --list to auto-infer the space)")
 
@@ -662,11 +658,6 @@ def cmd_tasks_search(client, args):
     name_prefix = getattr(args, "name_prefix", None)
     if not name_prefix and _TASK_ID_PATTERN.match(args.query):
         name_prefix = args.query
-        print(
-            f"hint: query \"{args.query}\" looks like a task ID — "
-            f"auto-applying --name-prefix \"{args.query}\" to filter exact matches",
-            file=sys.stderr,
-        )
 
     params = {"search": args.query}
     if args.include_closed:
