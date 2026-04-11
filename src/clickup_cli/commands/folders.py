@@ -1,5 +1,6 @@
-"""Folder command handlers — list, get, create, update, delete."""
+"""Folder command handlers — list, get, create, update, delete, privacy."""
 
+from ..config import WORKSPACE_ID
 from ..helpers import error, resolve_space_id, add_id_argument
 
 
@@ -16,11 +17,12 @@ Folders are containers that sit between spaces and lists. Use them to
 group related lists together (e.g. a "Sprint 1" folder under a space).
 
 Subcommands:
-  list    — list all folders in a space
-  get     — fetch full details of a folder by ID
-  create  — create a new folder in a space (mutating)
-  update  — update a folder's name (mutating)
-  delete  — delete a folder (destructive)
+  list     — list all folders in a space
+  get      — fetch full details of a folder by ID
+  create   — create a new folder in a space (mutating)
+  update   — update a folder's name (mutating)
+  delete   — delete a folder (destructive)
+  privacy  — make a folder private or public (mutating)
 
 Does not cover: reordering folders or setting folder-level statuses
 (use the ClickUp UI for these).""",
@@ -30,7 +32,8 @@ examples:
   clickup folders get 12345
   clickup --dry-run folders create --space <name> --name "My folder"
   clickup folders update 12345 --name "Renamed folder"
-  clickup --dry-run folders delete 12345""",
+  clickup --dry-run folders delete 12345
+  clickup folders privacy 12345 --private""",
     )
     folders_sub = folders_parser.add_subparsers(dest="command", required=True)
 
@@ -155,6 +158,42 @@ examples:
     )
     add_id_argument(fd, "folder_id", "ClickUp folder ID to delete")
 
+    # folders privacy
+    fp = folders_sub.add_parser(
+        "privacy",
+        formatter_class=F,
+        help="Make a folder private or public",
+        description="""\
+Toggle the privacy of a folder via the v3 ACLs endpoint. This flips the
+private/public boolean only — it does not grant or revoke individual
+member or guest access. Use the ClickUp UI for granular sharing.
+
+Exactly one of --private or --public is required.
+
+This is a mutating command. Use --dry-run to preview the request body.""",
+        epilog="""\
+returns:
+  {"status": "ok", "action": "set_privacy",
+   "object_type": "folder", "object_id": "...", "private": true|false}
+
+examples:
+  clickup folders privacy 12345 --private
+  clickup folders privacy 12345 --public
+  clickup folders privacy --folder-id 12345 --private
+  clickup --dry-run folders privacy 12345 --private
+
+notes:
+  Hits PATCH /v3/workspaces/{wid}/folder/{id}/acls.""",
+    )
+    add_id_argument(fp, "folder_id", "ClickUp folder ID")
+    fp_mode = fp.add_mutually_exclusive_group(required=True)
+    fp_mode.add_argument(
+        "--private", action="store_true", help="Make this folder private"
+    )
+    fp_mode.add_argument(
+        "--public", action="store_true", help="Make this folder public"
+    )
+
 
 def cmd_folders_list(client, args):
     """List all folders in a space."""
@@ -202,3 +241,28 @@ def cmd_folders_delete(client, args):
 
     client.delete_v2(f"/folder/{args.folder_id}")
     return {"status": "ok", "action": "deleted", "folder_id": args.folder_id}
+
+
+def cmd_folders_privacy(client, args):
+    """Set a folder private or public via the v3 ACLs endpoint."""
+    private = bool(args.private)
+    body = {"private": private}
+    path = f"/workspaces/{WORKSPACE_ID}/folder/{args.folder_id}/acls"
+
+    if client.dry_run:
+        return {
+            "dry_run": True,
+            "action": "set_privacy",
+            "object_type": "folder",
+            "object_id": args.folder_id,
+            "body": body,
+        }
+
+    client.patch_v3(path, data=body)
+    return {
+        "status": "ok",
+        "action": "set_privacy",
+        "object_type": "folder",
+        "object_id": args.folder_id,
+        "private": private,
+    }

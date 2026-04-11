@@ -589,6 +589,24 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.command, "delete")
         self.assertEqual(args.folder_id, "f123")
 
+    def test_folders_privacy_private(self):
+        args = self._parse(["folders", "privacy", "f123", "--private"])
+        self.assertEqual(args.command, "privacy")
+        self.assertEqual(args.folder_id, "f123")
+        self.assertTrue(args.private)
+
+    def test_folders_privacy_public(self):
+        args = self._parse(["folders", "privacy", "f123", "--public"])
+        self.assertTrue(args.public)
+
+    def test_folders_privacy_requires_mode(self):
+        with self.assertRaises(SystemExit):
+            self._parse(["folders", "privacy", "f123"])
+
+    def test_folders_privacy_rejects_both_modes(self):
+        with self.assertRaises(SystemExit):
+            self._parse(["folders", "privacy", "f123", "--private", "--public"])
+
     # --- team ---
 
     def test_team_whoami(self):

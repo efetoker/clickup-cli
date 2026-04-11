@@ -30,6 +30,7 @@ from clickup_cli.commands.folders import (
     cmd_folders_delete,
     cmd_folders_get,
     cmd_folders_list,
+    cmd_folders_privacy,
     cmd_folders_update,
 )
 from clickup_cli.commands.lists import (
@@ -513,6 +514,38 @@ class FoldersDeleteTests(unittest.TestCase):
         result = cmd_folders_delete(client, args)
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["action"], "deleted")
+
+
+class FoldersPrivacyTests(unittest.TestCase):
+
+    def test_set_private_actual(self):
+        client = FlexClient()
+        args = Namespace(folder_id="f1", private=True, public=False)
+        result = cmd_folders_privacy(client, args)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["object_type"], "folder")
+        self.assertEqual(result["object_id"], "f1")
+        self.assertTrue(result["private"])
+        call = client.calls[0]
+        self.assertEqual(call["method"], "PATCH_V3")
+        self.assertIn("/workspaces/test_workspace/folder/f1/acls", call["path"])
+        self.assertEqual(call["data"], {"private": True})
+
+    def test_set_public_actual(self):
+        client = FlexClient()
+        args = Namespace(folder_id="f1", private=False, public=True)
+        result = cmd_folders_privacy(client, args)
+        self.assertFalse(result["private"])
+        self.assertEqual(client.calls[0]["data"], {"private": False})
+
+    def test_dry_run(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(folder_id="f1", private=True, public=False)
+        result = cmd_folders_privacy(client, args)
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["object_type"], "folder")
+        self.assertEqual(result["body"], {"private": True})
+        self.assertEqual(client.calls, [])
 
 
 # ─── Lists ────────────────────────────────────────────────────────────────

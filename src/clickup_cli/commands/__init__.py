@@ -22,7 +22,7 @@ from .team import cmd_team_whoami, cmd_team_members
 from .tags import cmd_tags_list, cmd_tags_add, cmd_tags_remove
 from .folders import (
     cmd_folders_list, cmd_folders_get, cmd_folders_create,
-    cmd_folders_update, cmd_folders_delete,
+    cmd_folders_update, cmd_folders_delete, cmd_folders_privacy,
 )
 from .lists import (
     cmd_lists_list, cmd_lists_get, cmd_lists_create,
@@ -68,6 +68,7 @@ HANDLERS = {
     "folders_create": cmd_folders_create,
     "folders_update": cmd_folders_update,
     "folders_delete": cmd_folders_delete,
+    "folders_privacy": cmd_folders_privacy,
     "lists_list": cmd_lists_list,
     "lists_get": cmd_lists_get,
     "lists_create": cmd_lists_create,
