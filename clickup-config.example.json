@@ -4,6 +4,5 @@
   "user_id": "YOUR_USER_ID",
   "spaces": {
     "myspace": {"space_id": "SPACE_ID", "list_id": "DEFAULT_LIST_ID"}
-  },
-  "default_tags": []
+  }
 }

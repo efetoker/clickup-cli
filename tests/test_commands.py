@@ -1014,10 +1014,27 @@ class TasksCreateBehaviorTests(unittest.TestCase):
         result = cmd_tasks_create(client, args)
         self.assertEqual(result["body"]["status"], "in progress")
 
-    def test_no_tags_when_default_tags_empty(self):
+    def test_no_tags_by_default(self):
+        """tasks create must not inject any tags unless --tag is passed."""
         client = FlexClient(dry_run=True)
         args = self._make_args()
         result = cmd_tasks_create(client, args)
+        self.assertNotIn("tags", result["body"])
+
+    def test_no_tags_even_if_config_has_default_tags(self):
+        """Stale `default_tags` entries in config files must be ignored."""
+        import clickup_cli.config as cfg
+        client = FlexClient(dry_run=True)
+        args = self._make_args()
+        # Temporarily seed a stale default_tags field on the cached config —
+        # proves the CLI no longer reads it.
+        original = cfg._config_cache
+        cfg._config_cache = dict(original or {})
+        cfg._config_cache["default_tags"] = ["created by claude"]
+        try:
+            result = cmd_tasks_create(client, args)
+        finally:
+            cfg._config_cache = original
         self.assertNotIn("tags", result["body"])
 
     def test_space_inference_produces_empty_stderr(self):

@@ -5,7 +5,7 @@ import sys
 
 import requests
 
-from ..config import WORKSPACE_ID, SPACES, DEFAULT_TAGS
+from ..config import WORKSPACE_ID, SPACES
 from ..helpers import read_content, error, format_tasks, fetch_all_comments, add_id_argument
 
 
@@ -599,12 +599,7 @@ def cmd_tasks_create(client, args):
     list_id = _resolve_list_id(args)
     desc = read_content(args.desc, args.desc_file, "--desc")
 
-    tags = list(DEFAULT_TAGS)  # copy to avoid mutating config
-
     body = {"name": args.name}
-
-    if tags:
-        body["tags"] = tags
 
     if args.priority:
         body["priority"] = _resolve_priority(args.priority)

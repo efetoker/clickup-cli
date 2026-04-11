@@ -186,7 +186,6 @@ _ATTR_MAP = {
     "WORKSPACE_ID": lambda c: c["workspace_id"],
     "USER_ID": lambda c: c.get("user_id", ""),
     "SPACES": lambda c: c.get("spaces", {}),
-    "DEFAULT_TAGS": lambda c: c.get("default_tags", []),
 }
 
 

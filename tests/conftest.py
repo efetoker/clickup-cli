@@ -15,7 +15,6 @@ _test_config = {
         "dev": {"space_id": "333", "list_id": "444"},
         "staging": {"space_id": "555", "list_id": "666"},
     },
-    "default_tags": [],
 }
 
 _test_dir = tempfile.mkdtemp()

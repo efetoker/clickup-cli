@@ -304,10 +304,6 @@ class LazyAttrTests(unittest.TestCase):
         self.assertIn("testspace", config.SPACES)
         self.assertEqual(config.SPACES["testspace"]["space_id"], "111")
 
-    def test_default_tags(self):
-        from clickup_cli import config
-        self.assertEqual(config.DEFAULT_TAGS, [])
-
     def test_unknown_attr_raises(self):
         from clickup_cli import config
         with self.assertRaises(AttributeError):

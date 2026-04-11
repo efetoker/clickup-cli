@@ -131,7 +131,6 @@ def cmd_init(args):
         "workspace_id": workspace_id,
         "user_id": user_id,
         "spaces": spaces,
-        "default_tags": [],
     }
 
     # Write config

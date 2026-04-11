@@ -116,8 +116,7 @@ clickup tasks list --space <name> --pretty
   "user_id": "67890",
   "spaces": {
     "myspace": {"space_id": "111", "list_id": "222"}
-  },
-  "default_tags": []
+  }
 }
 ```
 
