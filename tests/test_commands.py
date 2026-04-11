@@ -61,6 +61,7 @@ from clickup_cli.commands.tasks import (
     cmd_tasks_create,
     cmd_tasks_update,
     cmd_tasks_search,
+    cmd_tasks_depend,
 )
 from clickup_cli.commands.init import cmd_init
 
@@ -95,8 +96,8 @@ class FlexClient:
     def put_v2(self, path, data=None):
         return self._handle("PUT", path, data=data)
 
-    def delete_v2(self, path):
-        return self._handle("DELETE", path)
+    def delete_v2(self, path, params=None):
+        return self._handle("DELETE", path, params=params)
 
     def get_v3(self, path, params=None, allow_dry_run=False):
         return self._handle("GET_V3", path, params=params, allow_dry_run=allow_dry_run)
@@ -1231,6 +1232,69 @@ class TagFilterTests(unittest.TestCase):
                          fields=None, full=False)
         result = cmd_tasks_list(client, args)
         self.assertTrue(result["dry_run"])
+
+
+class TasksDependTests(unittest.TestCase):
+    """Coverage for `tasks depend add/remove/list`."""
+
+    def _args(self, subcommand, **overrides):
+        defaults = dict(
+            subcommand=subcommand, task_id="abc123",
+            depends_on=None, dependency_of=None,
+        )
+        defaults.update(overrides)
+        return Namespace(**defaults)
+
+    def test_add_depends_on_posts_with_depends_on_body(self):
+        client = FlexClient(responses={"/task/abc123/dependency": {}})
+        cmd_tasks_depend(client, self._args("add", depends_on="def456"))
+        post_call = next(c for c in client.calls if c["method"] == "POST")
+        self.assertEqual(post_call["path"], "/task/abc123/dependency")
+        self.assertEqual(post_call["data"], {"depends_on": "def456"})
+
+    def test_add_depended_on_by_posts_with_dependency_of_body(self):
+        client = FlexClient(responses={"/task/abc123/dependency": {}})
+        cmd_tasks_depend(client, self._args("add", dependency_of="def456"))
+        post_call = next(c for c in client.calls if c["method"] == "POST")
+        self.assertEqual(post_call["data"], {"dependency_of": "def456"})
+
+    def test_remove_delete_carries_query_params(self):
+        client = FlexClient(responses={"/task/abc123/dependency": {}})
+        cmd_tasks_depend(client, self._args("remove", depends_on="def456"))
+        del_call = next(c for c in client.calls if c["method"] == "DELETE")
+        self.assertEqual(del_call["params"], {"depends_on": "def456"})
+
+    def test_dry_run_makes_no_api_calls(self):
+        client = FlexClient(dry_run=True)
+        result = cmd_tasks_depend(client, self._args("add", depends_on="def456"))
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["action"], "depend_add")
+        self.assertEqual(client.calls, [])
+
+    def test_add_without_direction_errors(self):
+        client = FlexClient()
+        with self.assertRaises(SystemExit):
+            cmd_tasks_depend(client, self._args("add"))
+
+    def test_list_partitions_dependencies_by_direction(self):
+        client = FlexClient(responses={
+            "/task/abc123": {
+                "id": "abc123",
+                "dependencies": [
+                    # abc123 waits on blocker1
+                    {"task_id": "abc123", "depends_on": "blocker1"},
+                    # blocked1 waits on abc123
+                    {"task_id": "blocked1", "depends_on": "abc123"},
+                ],
+            },
+        })
+        result = cmd_tasks_depend(client, self._args("list"))
+        # depends_on = what this task is waiting on
+        self.assertEqual(len(result["depends_on"]), 1)
+        self.assertEqual(result["depends_on"][0]["depends_on"], "blocker1")
+        # depended_on_by = who is waiting on this task
+        self.assertEqual(len(result["depended_on_by"]), 1)
+        self.assertEqual(result["depended_on_by"][0]["task_id"], "blocked1")
 
 
 class RawIdFlagAcceptanceTests(unittest.TestCase):

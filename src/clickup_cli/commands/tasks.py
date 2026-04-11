@@ -522,6 +522,92 @@ examples:
         help="Comma-separated source task IDs to merge into the target",
     )
 
+    # tasks depend — subcommand group for dependency CRUD
+    tdp = tasks_sub.add_parser(
+        "depend",
+        formatter_class=F,
+        help="Manage task dependencies (add, remove, list)",
+        description="""\
+Manage ClickUp task dependencies — the "waiting on" / "blocking"
+relationships between tasks. Dependencies have direction:
+
+  --depends-on      : this task is blocked until another task finishes
+  --depended-on-by  : another task is blocked until this task finishes
+
+Subcommands:
+  add     — create a dependency link
+  remove  — delete a dependency link
+  list    — list this task's current dependency links
+
+Under the hood these map to POST/DELETE /task/{id}/dependency and the
+`dependencies` field returned by GET /task/{id}.""",
+        epilog="""\
+examples:
+  clickup tasks depend add abc123 --depends-on def456
+  clickup tasks depend add abc123 --depended-on-by def456
+  clickup tasks depend remove abc123 --depends-on def456
+  clickup tasks depend list abc123
+  clickup --dry-run tasks depend add abc123 --depends-on def456""",
+    )
+    tdp_sub = tdp.add_subparsers(dest="subcommand", required=True)
+
+    for name, desc in (
+        ("add", "Create a dependency link between two tasks"),
+        ("remove", "Delete a dependency link between two tasks"),
+    ):
+        sp = tdp_sub.add_parser(
+            name,
+            formatter_class=F,
+            help=desc,
+            description=f"""\
+{desc}.
+
+Exactly one of --depends-on / --depended-on-by is required. The direction
+determines which task is blocked:
+
+  --depends-on BLOCKER_TASK_ID      : <task_id> waits for BLOCKER
+  --depended-on-by BLOCKED_TASK_ID  : BLOCKED waits for <task_id>
+
+Use --dry-run to preview without calling the API.""",
+        )
+        add_id_argument(sp, "task_id", "Target ClickUp task ID")
+        direction = sp.add_mutually_exclusive_group(required=True)
+        direction.add_argument(
+            "--depends-on",
+            dest="depends_on",
+            type=str,
+            metavar="OTHER_TASK_ID",
+            help="Other task this task is blocked by",
+        )
+        direction.add_argument(
+            "--depended-on-by",
+            dest="dependency_of",
+            type=str,
+            metavar="OTHER_TASK_ID",
+            help="Other task that is blocked by this task",
+        )
+
+    tdpl = tdp_sub.add_parser(
+        "list",
+        formatter_class=F,
+        help="List a task's current dependency links",
+        description="""\
+List the dependency links on a task. Returns both directions:
+
+  depends_on      — tasks that must finish before this one
+  depended_on_by  — tasks that are blocked by this one
+
+Delegates to GET /task/{id} and returns the `dependencies` array
+partitioned by direction.""",
+        epilog="""\
+returns:
+  {"task_id": "...", "depends_on": [...], "depended_on_by": [...]}
+
+examples:
+  clickup tasks depend list abc123""",
+    )
+    add_id_argument(tdpl, "task_id", "ClickUp task ID")
+
 PRIORITY_MAP = {"urgent": 1, "high": 2, "normal": 3, "low": 4}
 
 # Pattern for task ID queries like PROJ-39, BUG-12
@@ -875,6 +961,59 @@ def cmd_tasks_move(client, args):
     return client.put_v3(
         f"/workspaces/{WORKSPACE_ID}/tasks/{args.task_id}/home_list/{list_id}"
     )
+
+
+def cmd_tasks_depend(client, args):
+    """Dispatch `tasks depend {add,remove,list}` subcommands."""
+    sub = getattr(args, "subcommand", None)
+    if sub == "add":
+        return _tasks_depend_add(client, args)
+    if sub == "remove":
+        return _tasks_depend_remove(client, args)
+    if sub == "list":
+        return _tasks_depend_list(client, args)
+    error(f"Unknown tasks depend subcommand: {sub}")
+
+
+def _depend_body(args):
+    """Build the dependency body from --depends-on / --depended-on-by."""
+    if getattr(args, "depends_on", None):
+        return {"depends_on": args.depends_on}
+    if getattr(args, "dependency_of", None):
+        return {"dependency_of": args.dependency_of}
+    error("Provide either --depends-on <task_id> or --depended-on-by <task_id>")
+
+
+def _tasks_depend_add(client, args):
+    body = _depend_body(args)
+    if client.dry_run:
+        return {"dry_run": True, "action": "depend_add", "task_id": args.task_id, **body}
+    client.post_v2(f"/task/{args.task_id}/dependency", data=body)
+    return {"status": "ok", "action": "depend_added", "task_id": args.task_id, **body}
+
+
+def _tasks_depend_remove(client, args):
+    body = _depend_body(args)
+    if client.dry_run:
+        return {"dry_run": True, "action": "depend_remove", "task_id": args.task_id, **body}
+    client.delete_v2(f"/task/{args.task_id}/dependency", params=body)
+    return {"status": "ok", "action": "depend_removed", "task_id": args.task_id, **body}
+
+
+def _tasks_depend_list(client, args):
+    task = client.get_v2(f"/task/{args.task_id}")
+    dependencies = task.get("dependencies", []) or []
+    # ClickUp stores dependencies as {task_id (the waiter), depends_on (the blocker)}.
+    # From this task's POV:
+    #   - depends_on      : entries where the waiter is us
+    #   - depended_on_by  : entries where the blocker is us
+    depends_on = [d for d in dependencies if d.get("task_id") == args.task_id]
+    depended_on_by = [d for d in dependencies if d.get("depends_on") == args.task_id]
+    return {
+        "task_id": args.task_id,
+        "depends_on": depends_on,
+        "depended_on_by": depended_on_by,
+    }
 
 
 def cmd_tasks_merge(client, args):

@@ -100,8 +100,8 @@ class ClickUpClient:
     def put_v2(self, path, data=None):
         return self._request("PUT", f"{self.BASE_V2}{path}", json=data)
 
-    def delete_v2(self, path):
-        return self._request("DELETE", f"{self.BASE_V2}{path}")
+    def delete_v2(self, path, params=None):
+        return self._request("DELETE", f"{self.BASE_V2}{path}", params=params)
 
     def get_v3(self, path, params=None, allow_dry_run=False):
         return self._request(

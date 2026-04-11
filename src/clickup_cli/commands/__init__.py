@@ -4,6 +4,7 @@ from .tasks import (
     cmd_tasks_list, cmd_tasks_get, cmd_tasks_create,
     cmd_tasks_update, cmd_tasks_search,
     cmd_tasks_delete, cmd_tasks_move, cmd_tasks_merge,
+    cmd_tasks_depend,
 )
 from .comments import (
     cmd_comments_list, cmd_comments_add,
@@ -37,6 +38,7 @@ HANDLERS = {
     "tasks_delete": cmd_tasks_delete,
     "tasks_move": cmd_tasks_move,
     "tasks_merge": cmd_tasks_merge,
+    "tasks_depend": cmd_tasks_depend,
     "comments_list": cmd_comments_list,
     "comments_add": cmd_comments_add,
     "comments_update": cmd_comments_update,
