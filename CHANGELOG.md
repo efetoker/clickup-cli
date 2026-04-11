@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.4.0 (2026-04-11)
+
+- **`tasks update` now handles tags, assignees, and custom fields.** Five new repeatable flags: `--add-assignee` / `--remove-assignee` (packed into the PUT body), `--add-tag` / `--remove-tag` (issues one POST/DELETE per tag), and `--custom-field FIELD_ID=VALUE` (issues one POST per field). When no PUT body is needed, the task is re-fetched at the end so the returned JSON always reflects final state. `--dry-run` returns a structured plan with no API calls.
+- **New `tasks depend` subcommand group** — `add`, `remove`, and `list` for task dependencies. Direction is required and mutually exclusive: `--depends-on OTHER` (this task waits on OTHER) or `--depended-on-by OTHER` (OTHER waits on this). `list` partitions the task's `dependencies` array into both directions from the target task's point of view.
+- **`tasks list` and `tasks search` accept `--include-archived`.** Since ClickUp's `archived` param is a filter (returns only archived), the flag issues a second paginated request with `archived=true` and merges the results. Default behavior unchanged.
+- **Raw numeric IDs accepted on all name-lookup flags.** `--space` / `--folder` on folders, lists, spaces, and tasks commands now transparently accept raw ClickUp IDs alongside config aliases. On tasks commands, raw space IDs resolve via a one-call API lookup to the first folderless list in that space. Help metavars updated to `SPACE_NAME_OR_ID` for discoverability. Case-sensitive alias matching is unchanged — `Personal` vs `personal` remains a deliberate error.
+- **Fix: `tasks create` no longer leaks `hint: inferred --space` to stderr.** Same fix applied to `tasks search`'s auto name-prefix hint. Both are deterministic from inputs and the JSON response — the hints were informational noise that broke `2>&1 | jq` pipes.
+- **Fix: `tasks create` is now truly neutral.** The v1.3.0 release advertised neutral defaults but still read `default_tags` from the config file and applied it silently. Removed `default_tags` from the config schema entirely; stale entries in existing configs are now ignored.
+- **Fix: `tasks list --full` returns a consistent status shape.** Compact mode already flattened status to a string, but `--full` passed raw API shapes through — sometimes dict, sometimes string. Now `--full` always returns status as a dict (`{status, color, type, orderindex}`), upgrading string statuses with null metadata.
+- **Client: `delete_v2` accepts an optional `params` kwarg** to forward query parameters (needed for the dependency remove endpoint).
+- Test suite: 305 → 332 tests. Added coverage for stderr contract, archived pagination, status-shape normalization, raw-ID lookups, expanded update paths, and dependency CRUD.
+
+## 1.3.0 (2026-04-10)
+
+- Add `--tag` filter on `tasks list` (API-level, repeatable, auto-lowercased) and `tasks search` (client-side filter).
+- Remove opinionated `tasks create` defaults: no auto-assignee, no auto-priority, no auto-tags unless explicitly passed. (Note: `default_tags` config field was not fully removed until 1.4.0.)
+- Explicit `--assign <user_id>` flag for `tasks create` when you do want to assign.
+
 ## 1.2.0 (2026-03-29)
 
 **First PyPI release** — `pip install clickup-cli`
