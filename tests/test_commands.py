@@ -108,6 +108,9 @@ class FlexClient:
     def put_v3(self, path, data=None):
         return self._handle("PUT_V3", path, data=data)
 
+    def patch_v3(self, path, data=None):
+        return self._handle("PATCH_V3", path, data=data)
+
 
 # ─── Comments ─────────────────────────────────────────────────────────────
 

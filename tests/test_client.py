@@ -266,6 +266,33 @@ class V3MethodTests(ClientSetupMixin, unittest.TestCase):
         self.assertTrue(result["dry_run"])
         self.assertEqual(result["method"], "PUT")
 
+    def test_patch_v3(self):
+        client = self._make_client()
+        # Empty body — mirrors the real ClickUp ACLs response
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.ok = True
+        resp.text = ""
+        resp.headers = {}
+        client.session.request = MagicMock(return_value=resp)
+
+        result = client.patch_v3(
+            "/workspaces/123/space/456/acls", data={"private": True}
+        )
+        self.assertEqual(result, {})
+        call_args = client.session.request.call_args
+        self.assertEqual(call_args[0][0], "PATCH")
+        self.assertIn("v3", call_args[0][1])
+
+    def test_v3_dry_run_patch_returns_preview(self):
+        client = self._make_client(dry_run=True)
+        client.session.request = MagicMock()
+
+        result = client.patch_v3("/test", data={"private": False})
+        client.session.request.assert_not_called()
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["method"], "PATCH")
+
 
 class ResponseParsingTests(ClientSetupMixin, unittest.TestCase):
     """Tests for response body parsing edge cases."""

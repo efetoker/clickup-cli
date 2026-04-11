@@ -113,3 +113,6 @@ class ClickUpClient:
 
     def put_v3(self, path, data=None):
         return self._request("PUT", f"{self.BASE_V3}{path}", json=data)
+
+    def patch_v3(self, path, data=None):
+        return self._request("PATCH", f"{self.BASE_V3}{path}", json=data)
