@@ -113,6 +113,27 @@ def _extract_status(task):
     return status.get("status") if isinstance(status, dict) else status
 
 
+def _normalize_status_shape(task):
+    """Return a copy of `task` where the status field is always a dict.
+
+    The ClickUp API sometimes returns status as a plain string on certain
+    endpoints and as a dict ({status, color, type, orderindex}) on others.
+    Normalize to the dict shape so agent scripts can always access
+    `task["status"]["status"]` without defensive isinstance checks.
+    """
+    status = task.get("status")
+    if isinstance(status, str):
+        normalized = dict(task)
+        normalized["status"] = {
+            "status": status,
+            "color": None,
+            "type": None,
+            "orderindex": None,
+        }
+        return normalized
+    return task
+
+
 def _extract_priority(task):
     """Extract the priority string from a task's priority field."""
     priority = task.get("priority")
@@ -151,12 +172,13 @@ def filter_task_fields(task, fields):
 def format_tasks(tasks, full=False, fields=None):
     """Apply compact/fields/full formatting to a list of tasks.
 
-    - full=True: return raw API objects unchanged
-    - fields: return only those fields per task
-    - default: return compact view (id, name, status, priority, url)
+    - full=True: return raw API objects with status normalized to a dict shape
+    - fields: return only those fields per task (status flattened to string)
+    - default: return compact view (id, name, status, priority, url) —
+      status is a flat string
     """
     if full:
-        return tasks
+        return [_normalize_status_shape(t) for t in tasks]
     if fields:
         return [filter_task_fields(t, fields) for t in tasks]
     return [compact_task(t) for t in tasks]

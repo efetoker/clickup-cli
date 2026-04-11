@@ -9,8 +9,10 @@ import unittest
 from unittest.mock import MagicMock
 
 from clickup_cli.helpers import (
+    compact_task,
     error,
     fetch_all_comments,
+    format_tasks,
     output,
     read_content,
     resolve_space_id,
@@ -221,6 +223,53 @@ class FetchAllCommentsTests(unittest.TestCase):
         self.assertEqual(second_call[0][0], "/task/task1/comment")
         self.assertEqual(second_call[1]["params"]["start"], "1000")
         self.assertEqual(second_call[1]["params"]["start_id"], "c1")
+
+
+class FormatTasksStatusShapeTests(unittest.TestCase):
+    """format_tasks must normalize status field shape across all output modes."""
+
+    def _raw_dict_task(self):
+        return {
+            "id": "t1", "name": "dict task", "url": "u", "priority": None,
+            "status": {"status": "open", "color": "#f00", "type": "open",
+                       "orderindex": 0},
+        }
+
+    def _raw_string_task(self):
+        return {
+            "id": "t2", "name": "string task", "url": "u", "priority": None,
+            "status": "open",
+        }
+
+    def test_compact_flattens_both_shapes_to_string(self):
+        tasks = [self._raw_dict_task(), self._raw_string_task()]
+        out = format_tasks(tasks)
+        self.assertEqual(out[0]["status"], "open")
+        self.assertEqual(out[1]["status"], "open")
+
+    def test_full_always_returns_dict_shape(self):
+        tasks = [self._raw_dict_task(), self._raw_string_task()]
+        out = format_tasks(tasks, full=True)
+        self.assertIsInstance(out[0]["status"], dict)
+        self.assertIsInstance(out[1]["status"], dict)
+        self.assertEqual(out[0]["status"]["status"], "open")
+        self.assertEqual(out[1]["status"]["status"], "open")
+
+    def test_full_preserves_original_dict_metadata(self):
+        task = self._raw_dict_task()
+        out = format_tasks([task], full=True)
+        self.assertEqual(out[0]["status"]["color"], "#f00")
+        self.assertEqual(out[0]["status"]["type"], "open")
+
+    def test_full_does_not_mutate_input(self):
+        task = self._raw_string_task()
+        format_tasks([task], full=True)
+        self.assertEqual(task["status"], "open")  # unchanged
+
+    def test_compact_task_handles_string_status(self):
+        task = self._raw_string_task()
+        result = compact_task(task)
+        self.assertEqual(result["status"], "open")
 
 
 if __name__ == "__main__":
