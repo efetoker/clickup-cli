@@ -78,6 +78,7 @@ examples:
   clickup tasks list --space <name> --full
   clickup tasks list --space <name> --fields id,name,url
   clickup tasks list --space <name> --include-closed
+  clickup tasks list --space <name> --include-archived
   clickup tasks list --space <name> --status "in progress"
   clickup tasks list --space <name> --subtasks
   clickup tasks list --space <name> --tag "created by claude"
@@ -108,6 +109,12 @@ notes:
         "--include-closed",
         action="store_true",
         help="Include closed/completed tasks in results",
+    )
+    tl.add_argument(
+        "--include-archived",
+        action="store_true",
+        dest="include_archived",
+        help="Include archived tasks (makes a second API call and merges results)",
     )
     tl.add_argument(
         "--status", type=str, help="Filter tasks by status name (space-specific)"
@@ -337,6 +344,12 @@ notes:
         help="Include closed/completed tasks in results",
     )
     ts.add_argument(
+        "--include-archived",
+        action="store_true",
+        dest="include_archived",
+        help="Include archived tasks (makes a second API call and merges results)",
+    )
+    ts.add_argument(
         "--space", type=str, help="Scope search to a specific space"
     )
     ts.add_argument(
@@ -543,6 +556,14 @@ def cmd_tasks_list(client, args):
             params["tags[]"] = tag.lower()
 
     all_tasks = _paginate_tasks(client, f"/list/{list_id}/task", params)
+
+    if getattr(args, "include_archived", False):
+        archived_params = dict(params)
+        archived_params["archived"] = "true"
+        all_tasks.extend(
+            _paginate_tasks(client, f"/list/{list_id}/task", archived_params)
+        )
+
     return _format_and_wrap(all_tasks, args)
 
 
@@ -667,6 +688,13 @@ def cmd_tasks_search(client, args):
         params["project_ids[]"] = args.folder_id
 
     all_tasks = _paginate_tasks(client, f"/team/{WORKSPACE_ID}/task", params)
+
+    if getattr(args, "include_archived", False):
+        archived_params = dict(params)
+        archived_params["archived"] = "true"
+        all_tasks.extend(
+            _paginate_tasks(client, f"/team/{WORKSPACE_ID}/task", archived_params)
+        )
 
     if name_prefix:
         all_tasks = [

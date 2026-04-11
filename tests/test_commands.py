@@ -1160,6 +1160,70 @@ class TagFilterTests(unittest.TestCase):
         self.assertTrue(result["dry_run"])
 
 
+class TasksIncludeArchivedTests(unittest.TestCase):
+    """--include-archived flag: second API call with archived=true, merged results."""
+
+    def _list_args(self, **overrides):
+        defaults = dict(
+            space="testspace", list_id=None, include_closed=False,
+            include_archived=False, status=None, subtasks=False,
+            tags=None, fields=None, full=False,
+        )
+        defaults.update(overrides)
+        return Namespace(**defaults)
+
+    def test_list_single_call_when_flag_unset(self):
+        client = FlexClient(responses={
+            "/list/": {"tasks": [], "last_page": True},
+        })
+        cmd_tasks_list(client, self._list_args())
+        get_calls = [c for c in client.calls if c["method"] == "GET"]
+        self.assertEqual(len(get_calls), 1)
+        self.assertEqual(get_calls[0]["params"]["archived"], "false")
+
+    def test_list_two_calls_when_flag_set(self):
+        client = FlexClient(responses={
+            "/list/": {"tasks": [], "last_page": True},
+        })
+        cmd_tasks_list(client, self._list_args(include_archived=True))
+        get_calls = [c for c in client.calls if c["method"] == "GET"]
+        self.assertEqual(len(get_calls), 2)
+        seen_archived_values = {c["params"]["archived"] for c in get_calls}
+        self.assertEqual(seen_archived_values, {"false", "true"})
+
+    def test_list_merges_both_result_sets(self):
+        def _resp(path, kwargs):
+            archived_flag = kwargs.get("params", {}).get("archived")
+            if archived_flag == "true":
+                return {"tasks": [{"id": "a1", "name": "archived task",
+                                   "status": {"status": "open"},
+                                   "priority": None, "url": "u"}],
+                        "last_page": True}
+            return {"tasks": [{"id": "n1", "name": "live task",
+                               "status": {"status": "open"},
+                               "priority": None, "url": "u"}],
+                    "last_page": True}
+        client = FlexClient(responses={"/list/": _resp})
+        result = cmd_tasks_list(client, self._list_args(include_archived=True))
+        task_ids = {t["id"] for t in result["tasks"]}
+        self.assertEqual(task_ids, {"n1", "a1"})
+        self.assertEqual(result["count"], 2)
+
+    def test_search_include_archived_makes_two_calls(self):
+        client = FlexClient(responses={
+            "/task": {"tasks": [], "last_page": True},
+        })
+        args = Namespace(query="bug", include_closed=False,
+                         include_archived=True, space=None, list_id=None,
+                         folder_id=None, name_prefix=None, tags=None,
+                         fields=None, full=False)
+        cmd_tasks_search(client, args)
+        get_calls = [c for c in client.calls if c["method"] == "GET"]
+        self.assertEqual(len(get_calls), 2)
+        archived_flags = [c["params"].get("archived") for c in get_calls]
+        self.assertIn("true", archived_flags)
+
+
 # ─── CLI dispatch ─────────────────────────────────────────────────────────
 
 
