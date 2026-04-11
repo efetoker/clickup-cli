@@ -257,32 +257,45 @@ notes:
     tu = tasks_sub.add_parser(
         "update",
         formatter_class=F,
-        help="Update fields on an existing task",
+        help="Update fields on an existing task (core, assignees, tags, custom fields)",
         description="""\
 Update one or more fields on an existing task. This is a mutating command.
 
-At least one mutable field is required: --name, --status, --priority,
---desc, or --desc-file. If none are provided, the command exits with an error.
+Core fields are sent in one PUT request: --name, --status, --priority,
+--desc / --desc-file, plus assignee diffs (--add-assignee / --remove-assignee).
 
-Use --desc for inline text or --desc-file for file-based content.
-Do not use both at the same time.
+Tag changes run as extra POST/DELETE calls (one per tag) because the
+ClickUp API handles tags on a per-task endpoint.
 
-Use --dry-run to preview the request body without applying changes.
+Custom fields run as extra POST calls (one per field) for the same reason.
+Format: --custom-field FIELD_ID=VALUE — repeat for multiple fields.
+
+At least one mutable operation is required — otherwise the command exits
+with an error. All operations are gated by --dry-run: in dry-run mode the
+command returns a structured plan and makes no API calls.
+
 Global flags may appear before or after the command group:
   clickup --dry-run tasks update abc123 --status "complete" """,
         epilog="""\
 returns:
-  The updated task object from the API.
+  On live runs: the updated task object returned by the final PUT
+  (or the task as of the last mutation if no PUT was issued).
+  On --dry-run: a structured plan describing the PUT body and each
+  side-effect call that would run.
 
 examples:
   clickup tasks update abc123 --name "Renamed task"
   clickup tasks update abc123 --status "complete"
-  clickup tasks update abc123 --desc-file updated_spec.md
-  clickup --dry-run tasks update abc123 --status "in progress"
+  clickup tasks update abc123 --add-tag "in review" --remove-tag "draft"
+  clickup tasks update abc123 --add-assignee 12345 --remove-assignee 67890
+  clickup tasks update abc123 --custom-field abc-uuid=high --custom-field xyz-uuid=42
+  clickup --dry-run tasks update abc123 --add-tag urgent
 
 notes:
   --desc and --desc-file are mutually exclusive. Using both is an error.
-  Does not support: changing assignees, tags, or custom fields.""",
+  Tag names are auto-lowercased.
+  --custom-field values are sent as strings; the ClickUp API coerces
+  them to the field's declared type.""",
     )
     add_id_argument(tu, "task_id", "ClickUp task ID to update")
     tu.add_argument("--name", type=str, help="New task name")
@@ -297,6 +310,41 @@ notes:
     )
     tu.add_argument(
         "--desc-file", type=str, help="Path to a file containing description content"
+    )
+    tu.add_argument(
+        "--add-assignee",
+        dest="add_assignees",
+        action="append",
+        metavar="USER_ID",
+        help="Assign user ID to the task (repeatable)",
+    )
+    tu.add_argument(
+        "--remove-assignee",
+        dest="remove_assignees",
+        action="append",
+        metavar="USER_ID",
+        help="Unassign user ID from the task (repeatable)",
+    )
+    tu.add_argument(
+        "--add-tag",
+        dest="add_tags",
+        action="append",
+        metavar="TAG",
+        help="Tag to add to the task (repeatable, auto-lowercased)",
+    )
+    tu.add_argument(
+        "--remove-tag",
+        dest="remove_tags",
+        action="append",
+        metavar="TAG",
+        help="Tag to remove from the task (repeatable, auto-lowercased)",
+    )
+    tu.add_argument(
+        "--custom-field",
+        dest="custom_fields",
+        action="append",
+        metavar="FIELD_ID=VALUE",
+        help="Custom field to set (repeatable, format: field_uuid=value)",
     )
 
     # tasks search
@@ -687,8 +735,20 @@ def cmd_tasks_create(client, args):
     return client.post_v2(f"/list/{list_id}/task", data=body)
 
 
+def _parse_custom_field(raw):
+    """Parse a --custom-field FIELD_ID=VALUE token."""
+    if "=" not in raw:
+        error(f"Invalid --custom-field value (expected FIELD_ID=VALUE): {raw}")
+    field_id, _, value = raw.partition("=")
+    field_id = field_id.strip()
+    if not field_id:
+        error(f"Invalid --custom-field value (empty field id): {raw}")
+    return field_id, value
+
+
 def cmd_tasks_update(client, args):
     desc = read_content(args.desc, args.desc_file, "--desc")
+
     body = {}
     if args.name:
         body["name"] = args.name
@@ -699,12 +759,53 @@ def cmd_tasks_update(client, args):
     if args.priority:
         body["priority"] = _resolve_priority(args.priority)
 
-    if not body:
+    add_assignees = [int(u) for u in (getattr(args, "add_assignees", None) or [])]
+    rem_assignees = [int(u) for u in (getattr(args, "remove_assignees", None) or [])]
+    if add_assignees or rem_assignees:
+        body["assignees"] = {"add": add_assignees, "rem": rem_assignees}
+
+    add_tags = [t.lower() for t in (getattr(args, "add_tags", None) or [])]
+    remove_tags = [t.lower() for t in (getattr(args, "remove_tags", None) or [])]
+    custom_fields = [
+        _parse_custom_field(raw)
+        for raw in (getattr(args, "custom_fields", None) or [])
+    ]
+
+    if not body and not add_tags and not remove_tags and not custom_fields:
         error(
-            "Nothing to update — provide at least one of: --name, --status, --desc, --desc-file, --priority"
+            "Nothing to update — provide at least one of: --name, --status, --desc, "
+            "--desc-file, --priority, --add-assignee, --remove-assignee, --add-tag, "
+            "--remove-tag, --custom-field"
         )
 
-    return client.put_v2(f"/task/{args.task_id}", data=body)
+    plan = {
+        "task_id": args.task_id,
+        "put_body": body or None,
+        "tag_adds": add_tags,
+        "tag_removes": remove_tags,
+        "custom_fields": [{"field_id": fid, "value": val} for fid, val in custom_fields],
+    }
+
+    if client.dry_run:
+        return {"dry_run": True, "action": "update_task", **plan}
+
+    result = None
+    if body:
+        result = client.put_v2(f"/task/{args.task_id}", data=body)
+
+    for tag in add_tags:
+        client.post_v2(f"/task/{args.task_id}/tag/{tag}", data={})
+    for tag in remove_tags:
+        client.delete_v2(f"/task/{args.task_id}/tag/{tag}")
+
+    for field_id, value in custom_fields:
+        client.post_v2(f"/task/{args.task_id}/field/{field_id}", data={"value": value})
+
+    if result is None:
+        # Side-effect-only update — fetch the current task state to return.
+        result = client.get_v2(f"/task/{args.task_id}")
+
+    return result
 
 
 def cmd_tasks_search(client, args):

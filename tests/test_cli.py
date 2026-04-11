@@ -341,7 +341,7 @@ class DryRunTests(unittest.TestCase):
         self.assertEqual(result["task_id"], "abc123")
 
     def test_tasks_update_dry_run(self):
-        """Update goes through client.put_v2 which respects dry_run at client level."""
+        """Update returns a structured plan in dry-run mode (no API calls)."""
         client = ClickUpClient("fake-token", dry_run=True)
         args = Namespace(
             task_id="abc123",
@@ -355,7 +355,8 @@ class DryRunTests(unittest.TestCase):
         result = cmd_tasks_update(client, args)
 
         self.assertTrue(result["dry_run"])
-        self.assertEqual(result["method"], "PUT")
+        self.assertEqual(result["action"], "update_task")
+        self.assertEqual(result["put_body"]["name"], "Updated")
 
     def test_comments_add_dry_run(self):
         """Comments add goes through client.post_v2 which respects dry_run at client level."""

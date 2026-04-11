@@ -975,6 +975,79 @@ class TasksUpdateBehaviorTests(unittest.TestCase):
             cmd_tasks_update(client, args)
 
 
+class TasksUpdateExpandedFieldsTests(unittest.TestCase):
+    """Coverage for assignee/tag/custom-field support on tasks update."""
+
+    def _args(self, **overrides):
+        defaults = dict(
+            task_id="t1", name=None, status=None, desc=None, desc_file=None,
+            priority=None, add_assignees=None, remove_assignees=None,
+            add_tags=None, remove_tags=None, custom_fields=None,
+        )
+        defaults.update(overrides)
+        return Namespace(**defaults)
+
+    def test_assignee_diff_packed_into_put_body(self):
+        client = FlexClient(responses={"/task/": {"id": "t1"}})
+        cmd_tasks_update(client, self._args(
+            add_assignees=["123", "456"], remove_assignees=["789"]))
+        put_call = next(c for c in client.calls if c["method"] == "PUT")
+        self.assertEqual(put_call["data"]["assignees"], {"add": [123, 456], "rem": [789]})
+
+    def test_tag_add_issues_post_per_tag(self):
+        client = FlexClient(responses={
+            "/task/t1": {"id": "t1"},
+        })
+        cmd_tasks_update(client, self._args(
+            add_tags=["Urgent", "In Review"]))
+        post_calls = [c for c in client.calls if c["method"] == "POST"]
+        tag_names = [c["path"].rsplit("/", 1)[-1] for c in post_calls]
+        self.assertEqual(tag_names, ["urgent", "in review"])
+
+    def test_tag_remove_issues_delete_per_tag(self):
+        client = FlexClient(responses={"/task/t1": {"id": "t1"}})
+        cmd_tasks_update(client, self._args(remove_tags=["draft"]))
+        delete_calls = [c for c in client.calls if c["method"] == "DELETE"]
+        self.assertEqual(len(delete_calls), 1)
+        self.assertTrue(delete_calls[0]["path"].endswith("/tag/draft"))
+
+    def test_custom_field_posts_one_per_field(self):
+        client = FlexClient(responses={"/task/t1": {"id": "t1"}})
+        cmd_tasks_update(client, self._args(
+            custom_fields=["abc-uuid=high", "xyz-uuid=42"]))
+        post_calls = [c for c in client.calls if c["method"] == "POST"]
+        # Last one should target /task/t1/field/xyz-uuid with value 42
+        self.assertEqual(post_calls[-1]["path"], "/task/t1/field/xyz-uuid")
+        self.assertEqual(post_calls[-1]["data"], {"value": "42"})
+
+    def test_custom_field_bad_format_errors(self):
+        client = FlexClient()
+        with self.assertRaises(SystemExit):
+            cmd_tasks_update(client, self._args(custom_fields=["nomarkerhere"]))
+
+    def test_side_effect_only_update_fetches_final_state(self):
+        """When no PUT body is needed, fetch the task to return final state."""
+        client = FlexClient(responses={"/task/t1": {"id": "t1", "name": "fetched"}})
+        result = cmd_tasks_update(client, self._args(add_tags=["urgent"]))
+        methods = [c["method"] for c in client.calls]
+        self.assertIn("GET", methods)
+        self.assertEqual(result.get("name"), "fetched")
+
+    def test_dry_run_returns_plan_without_calls(self):
+        client = FlexClient(dry_run=True)
+        result = cmd_tasks_update(client, self._args(
+            name="renamed", add_tags=["urgent"], remove_tags=["draft"],
+            add_assignees=["42"],
+            custom_fields=["f1=hello"]))
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["put_body"]["name"], "renamed")
+        self.assertEqual(result["tag_adds"], ["urgent"])
+        self.assertEqual(result["tag_removes"], ["draft"])
+        self.assertEqual(result["custom_fields"], [{"field_id": "f1", "value": "hello"}])
+        # Dry-run must not issue any API call
+        self.assertEqual(client.calls, [])
+
+
 class TasksCreateBehaviorTests(unittest.TestCase):
 
     def _make_args(self, **overrides):
