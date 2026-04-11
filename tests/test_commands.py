@@ -42,6 +42,7 @@ from clickup_cli.commands.lists import (
 from clickup_cli.commands.spaces import (
     cmd_spaces_get,
     cmd_spaces_list,
+    cmd_spaces_privacy,
     cmd_spaces_statuses,
 )
 from clickup_cli.commands.tags import (
@@ -708,6 +709,50 @@ class SpacesStatusesTests(unittest.TestCase):
         result = cmd_spaces_statuses(client, args)
         self.assertEqual(result["count"], 0)
         self.assertEqual(result["statuses"], [])
+
+
+class SpacesPrivacyTests(unittest.TestCase):
+
+    def test_set_private_actual(self):
+        client = FlexClient()
+        args = Namespace(space="testspace", private=True, public=False)
+        result = cmd_spaces_privacy(client, args)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["action"], "set_privacy")
+        self.assertEqual(result["object_type"], "space")
+        self.assertEqual(result["object_id"], "111")
+        self.assertTrue(result["private"])
+        # Verify PATCH call
+        self.assertEqual(len(client.calls), 1)
+        call = client.calls[0]
+        self.assertEqual(call["method"], "PATCH_V3")
+        self.assertIn("/workspaces/test_workspace/space/111/acls", call["path"])
+        self.assertEqual(call["data"], {"private": True})
+
+    def test_set_public_actual(self):
+        client = FlexClient()
+        args = Namespace(space="testspace", private=False, public=True)
+        result = cmd_spaces_privacy(client, args)
+        self.assertFalse(result["private"])
+        self.assertEqual(client.calls[0]["data"], {"private": False})
+
+    def test_dry_run(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(space="testspace", private=True, public=False)
+        result = cmd_spaces_privacy(client, args)
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["action"], "set_privacy")
+        self.assertEqual(result["object_type"], "space")
+        self.assertEqual(result["object_id"], "111")
+        self.assertEqual(result["body"], {"private": True})
+        # No PATCH call recorded — handler short-circuits before calling
+        self.assertEqual(client.calls, [])
+
+    def test_raw_space_id(self):
+        client = FlexClient()
+        args = Namespace(space="999999", private=True, public=False)
+        cmd_spaces_privacy(client, args)
+        self.assertIn("/space/999999/acls", client.calls[0]["path"])
 
 
 # ─── Tags ─────────────────────────────────────────────────────────────────

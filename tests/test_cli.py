@@ -542,6 +542,26 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.command, "statuses")
         self.assertEqual(args.space, "myspace")
 
+    def test_spaces_privacy_private(self):
+        args = self._parse(["spaces", "privacy", "myspace", "--private"])
+        self.assertEqual(args.command, "privacy")
+        self.assertEqual(args.space, "myspace")
+        self.assertTrue(args.private)
+        self.assertFalse(args.public)
+
+    def test_spaces_privacy_public(self):
+        args = self._parse(["spaces", "privacy", "myspace", "--public"])
+        self.assertTrue(args.public)
+        self.assertFalse(args.private)
+
+    def test_spaces_privacy_requires_mode(self):
+        with self.assertRaises(SystemExit):
+            self._parse(["spaces", "privacy", "myspace"])
+
+    def test_spaces_privacy_rejects_both_modes(self):
+        with self.assertRaises(SystemExit):
+            self._parse(["spaces", "privacy", "myspace", "--private", "--public"])
+
     # --- folders ---
 
     def test_folders_list(self):

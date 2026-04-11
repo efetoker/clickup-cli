@@ -15,7 +15,9 @@ from .docs import (
     cmd_docs_list, cmd_docs_get, cmd_docs_create, cmd_docs_pages,
     cmd_docs_get_page, cmd_docs_edit_page, cmd_docs_create_page,
 )
-from .spaces import cmd_spaces_list, cmd_spaces_get, cmd_spaces_statuses
+from .spaces import (
+    cmd_spaces_list, cmd_spaces_get, cmd_spaces_statuses, cmd_spaces_privacy,
+)
 from .team import cmd_team_whoami, cmd_team_members
 from .tags import cmd_tags_list, cmd_tags_add, cmd_tags_remove
 from .folders import (
@@ -55,6 +57,7 @@ HANDLERS = {
     "spaces_list": cmd_spaces_list,
     "spaces_get": cmd_spaces_get,
     "spaces_statuses": cmd_spaces_statuses,
+    "spaces_privacy": cmd_spaces_privacy,
     "team_whoami": cmd_team_whoami,
     "team_members": cmd_team_members,
     "tags_list": cmd_tags_list,

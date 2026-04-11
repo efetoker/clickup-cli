@@ -1,4 +1,4 @@
-"""Space command handlers — list, get, statuses."""
+"""Space command handlers — list, get, statuses, privacy."""
 
 from ..config import WORKSPACE_ID
 from ..helpers import resolve_space_id, add_id_argument
@@ -11,24 +11,28 @@ def register_parser(subparsers, F):
         formatter_class=F,
         help="List spaces, view details, and discover statuses",
         description="""\
-Inspect workspace spaces — list all spaces, view space details, and
-discover valid statuses per space.
+Inspect workspace spaces — list all spaces, view space details, discover
+valid statuses, and toggle space privacy.
 
 Subcommands:
   list      — list all spaces in the workspace
   get       — fetch full details of a specific space
   statuses  — list valid statuses for a space
+  privacy   — make a space private or public (mutating)
 
-All commands are read-only. Configured space names and raw ClickUp
-space IDs are both accepted.""",
+list / get / statuses are read-only. privacy is mutating and supports
+--dry-run. Configured space names and raw ClickUp space IDs are both
+accepted.""",
         epilog="""\
 examples:
   clickup spaces list
   clickup spaces get <space>
   clickup spaces statuses <space>
+  clickup spaces privacy <space> --private
+  clickup --dry-run spaces privacy <space> --public
 
 notes:
-  These commands hit the API directly — no caching.
+  Read commands hit the API directly — no caching.
   Use 'spaces statuses' to find valid status names before setting
   task statuses, avoiding "Status does not exist" errors.""",
     )
@@ -103,6 +107,43 @@ notes:
     )
     add_id_argument(ss, "space", "Space name (from config) or raw space ID")
 
+    # spaces privacy
+    sp = spaces_sub.add_parser(
+        "privacy",
+        formatter_class=F,
+        help="Make a space private or public",
+        description="""\
+Toggle the privacy of a space via the v3 ACLs endpoint. This flips the
+private/public boolean only — it does not grant or revoke individual
+member or guest access. Use the ClickUp UI for granular sharing.
+
+Exactly one of --private or --public is required.
+
+This is a mutating command. Use --dry-run to preview the request body.""",
+        epilog="""\
+returns:
+  {"status": "ok", "action": "set_privacy",
+   "object_type": "space", "object_id": "...", "private": true|false}
+
+examples:
+  clickup spaces privacy <space> --private
+  clickup spaces privacy <space> --public
+  clickup spaces privacy --space <space> --private
+  clickup --dry-run spaces privacy 901810200000 --private
+
+notes:
+  Accepts a configured space name or raw space ID.
+  Hits PATCH /v3/workspaces/{wid}/space/{id}/acls.""",
+    )
+    add_id_argument(sp, "space", "Space name (from config) or raw space ID")
+    sp_mode = sp.add_mutually_exclusive_group(required=True)
+    sp_mode.add_argument(
+        "--private", action="store_true", help="Make this space private"
+    )
+    sp_mode.add_argument(
+        "--public", action="store_true", help="Make this space public"
+    )
+
 
 def cmd_spaces_list(client, args):
     """List all spaces in the workspace."""
@@ -134,4 +175,30 @@ def cmd_spaces_statuses(client, args):
             for s in statuses
         ],
         "count": len(statuses),
+    }
+
+
+def cmd_spaces_privacy(client, args):
+    """Set a space private or public via the v3 ACLs endpoint."""
+    space_id = resolve_space_id(args.space)
+    private = bool(args.private)
+    body = {"private": private}
+    path = f"/workspaces/{WORKSPACE_ID}/space/{space_id}/acls"
+
+    if client.dry_run:
+        return {
+            "dry_run": True,
+            "action": "set_privacy",
+            "object_type": "space",
+            "object_id": space_id,
+            "body": body,
+        }
+
+    client.patch_v3(path, data=body)
+    return {
+        "status": "ok",
+        "action": "set_privacy",
+        "object_type": "space",
+        "object_id": space_id,
+        "private": private,
     }
