@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 (2026-04-12)
+
+- **New `privacy` subcommand on `spaces`, `folders`, and `lists`.** Toggle the privacy of a space, folder, or list via the v3 ACLs endpoint without leaving the terminal. Each subcommand takes a positional ID (or its `--<id>` flag form) plus a required mutually exclusive `--private` / `--public` flag. Hits `PATCH /v3/workspaces/{wid}/{space|folder|list}/{id}/acls` with a minimal `{"private": true|false}` body. Granular ACL entries (member or guest grants) are intentionally not exposed — use the ClickUp UI for that.
+- **`--dry-run` support** on every privacy command. Returns a structured plan (`{"dry_run": true, "action": "set_privacy", "object_type": ..., "object_id": ..., "body": ...}`) with zero API calls.
+- **Consistent return shape across all three groups.** On success: `{"status": "ok", "action": "set_privacy", "object_type": "space"|"folder"|"list", "object_id": "...", "private": true|false}`. Same keys regardless of which group invoked it — agent scripts can parse one shape.
+- **Client: `patch_v3` method** added to `ClickUpClient` for v3 PATCH endpoints (used by the new privacy commands; first PATCH consumer in the codebase).
+- Test suite: 332 → 356 tests. Added coverage for `patch_v3` (real + dry-run), the three new privacy handlers (private/public/dry-run, plus raw-ID resolution on spaces), and parser-level mutex tests for each group.
+
 ## 1.4.0 (2026-04-11)
 
 - **`tasks update` now handles tags, assignees, and custom fields.** Five new repeatable flags: `--add-assignee` / `--remove-assignee` (packed into the PUT body), `--add-tag` / `--remove-tag` (issues one POST/DELETE per tag), and `--custom-field FIELD_ID=VALUE` (issues one POST per field). When no PUT body is needed, the task is re-fetched at the end so the returned JSON always reflects final state. `--dry-run` returns a structured plan with no API calls.
