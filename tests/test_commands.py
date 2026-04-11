@@ -1160,6 +1160,68 @@ class TagFilterTests(unittest.TestCase):
         self.assertTrue(result["dry_run"])
 
 
+class RawIdFlagAcceptanceTests(unittest.TestCase):
+    """--space / --folder name-lookup flags must accept raw numeric IDs."""
+
+    def test_folders_create_with_raw_space_id(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(space="901810236409", name="sprint-1")
+        from clickup_cli.commands.folders import cmd_folders_create
+        result = cmd_folders_create(client, args)
+        self.assertEqual(result["space_id"], "901810236409")
+
+    def test_folders_list_with_raw_space_id(self):
+        client = FlexClient(responses={
+            "/space/": {"folders": [], "last_page": True}
+        })
+        args = Namespace(space="901810236409")
+        from clickup_cli.commands.folders import cmd_folders_list
+        cmd_folders_list(client, args)
+        self.assertIn("901810236409", client.calls[-1]["path"])
+
+    def test_spaces_get_with_raw_id(self):
+        client = FlexClient(responses={"/space/": {"id": "111", "name": "x"}})
+        args = Namespace(space="901810236409")
+        from clickup_cli.commands.spaces import cmd_spaces_get
+        cmd_spaces_get(client, args)
+        self.assertIn("901810236409", client.calls[-1]["path"])
+
+    def test_folders_create_unknown_alias_still_errors(self):
+        """Unknown non-numeric aliases should still error loudly."""
+        client = FlexClient(dry_run=True)
+        args = Namespace(space="Personal", name="sprint-1")  # case mismatch
+        from clickup_cli.commands.folders import cmd_folders_create
+        with self.assertRaises(SystemExit):
+            cmd_folders_create(client, args)
+
+    def test_tasks_list_with_raw_space_id_does_api_lookup(self):
+        client = FlexClient(responses={
+            "/space/901810236409/list": {
+                "lists": [{"id": "inferred_list"}],
+            },
+            "/list/inferred_list/task": {"tasks": [], "last_page": True},
+        })
+        args = Namespace(space="901810236409", list_id=None,
+                         include_closed=False, include_archived=False,
+                         status=None, subtasks=False, tags=None,
+                         fields=None, full=False)
+        cmd_tasks_list(client, args)
+        paths = [c["path"] for c in client.calls]
+        self.assertTrue(any("/space/901810236409/list" in p for p in paths))
+        self.assertTrue(any("/list/inferred_list/task" in p for p in paths))
+
+    def test_tasks_list_raw_space_empty_lists_errors(self):
+        client = FlexClient(responses={
+            "/space/901810236409/list": {"lists": []},
+        })
+        args = Namespace(space="901810236409", list_id=None,
+                         include_closed=False, include_archived=False,
+                         status=None, subtasks=False, tags=None,
+                         fields=None, full=False)
+        with self.assertRaises(SystemExit):
+            cmd_tasks_list(client, args)
+
+
 class TasksIncludeArchivedTests(unittest.TestCase):
     """--include-archived flag: second API call with archived=true, merged results."""
 

@@ -96,6 +96,7 @@ notes:
     )
     tl.add_argument(
         "--space",
+        metavar="SPACE_NAME_OR_ID",
         type=str,
         help="Space name (from config) or raw space ID — uses the space's default list",
     )
@@ -216,8 +217,9 @@ notes:
     )
     tc.add_argument(
         "--space",
+        metavar="SPACE_NAME_OR_ID",
         type=str,
-        help="Target space (auto-inferred from --list if omitted)",
+        help="Target space name or raw ID (auto-inferred from --list if omitted)",
     )
     tc.add_argument(
         "--list",
@@ -350,7 +352,10 @@ notes:
         help="Include archived tasks (makes a second API call and merges results)",
     )
     ts.add_argument(
-        "--space", type=str, help="Scope search to a specific space"
+        "--space",
+        metavar="SPACE_NAME_OR_ID",
+        type=str,
+        help="Scope search to a specific space (name from config or raw ID)",
     )
     ts.add_argument(
         "--list", type=str, dest="list_id", help="Scope search to a specific list ID"
@@ -502,16 +507,52 @@ def _resolve_priority(priority_arg):
     error(f"Invalid priority: {priority_arg}. Use: urgent, high, normal, low (or 1-4)")
 
 
-def _resolve_list_id(args):
-    """Resolve the target list ID from --list or --space args."""
+def _resolve_list_id(args, client=None):
+    """Resolve the target list ID from --list or --space args.
+
+    --list wins when present. Otherwise --space may be a configured alias
+    (from config file) or a raw ClickUp space ID. Raw IDs require a `client`
+    because resolving a space to a default list costs one API call.
+    """
     if hasattr(args, "list_id") and args.list_id:
         return args.list_id
     if hasattr(args, "space") and args.space:
         space = SPACES.get(args.space)
-        if not space:
-            error(f"Unknown space: {args.space}. Check your config file.")
+        if space:
+            return space["list_id"]
+        if args.space.isdigit():
+            if client is None:
+                error(
+                    f"Raw space ID {args.space} needs an API lookup but no "
+                    "client is available. Use --list <list_id> instead."
+                )
+            return _first_folderless_list_id(client, args.space)
+        error(f"Unknown space: {args.space}. Check your config file.")
+    error("Provide either --space <name|id> or --list <list_id>")
+
+
+def _first_folderless_list_id(client, space_id):
+    """Return the first folderless list ID in a space, via API lookup."""
+    resp = client.get_v2(f"/space/{space_id}/list", allow_dry_run=True)
+    lists = resp.get("lists", [])
+    if not lists:
+        error(
+            f"Space {space_id} has no folderless lists. "
+            "Pass --list <list_id> to target a list inside a folder."
+        )
+    return lists[0]["id"]
+
+
+def _resolve_scope_list_id(client, space_arg):
+    """Resolve --space (alias or raw ID) to a list_id for search scoping."""
+    if not space_arg:
+        return None
+    space = SPACES.get(space_arg)
+    if space:
         return space["list_id"]
-    error("Provide either --space <name> or --list <list_id>")
+    if space_arg.isdigit():
+        return _first_folderless_list_id(client, space_arg)
+    error(f"Unknown space: {space_arg}. Check your config file.")
 
 
 def _paginate_tasks(client, path, params):
@@ -539,7 +580,7 @@ def _filter_by_tags(tasks, tag_names):
 
 
 def cmd_tasks_list(client, args):
-    list_id = _resolve_list_id(args)
+    list_id = _resolve_list_id(args, client=client)
     if client.dry_run:
         return {"dry_run": True, "action": "list_tasks", "list_id": list_id}
 
@@ -617,7 +658,7 @@ def cmd_tasks_create(client, args):
     if not args.space:
         error("--space is required (or provide --list to auto-infer the space)")
 
-    list_id = _resolve_list_id(args)
+    list_id = _resolve_list_id(args, client=client)
     desc = read_content(args.desc, args.desc_file, "--desc")
 
     body = {"name": args.name}
@@ -679,9 +720,9 @@ def cmd_tasks_search(client, args):
     if args.include_closed:
         params["include_closed"] = "true"
     if args.space:
-        space = SPACES.get(args.space)
-        if space:
-            params["list_ids[]"] = space["list_id"]
+        scope_list_id = _resolve_scope_list_id(client, args.space)
+        if scope_list_id:
+            params["list_ids[]"] = scope_list_id
     if hasattr(args, "list_id") and args.list_id:
         params["list_ids[]"] = args.list_id
     if hasattr(args, "folder_id") and args.folder_id:

@@ -61,12 +61,16 @@ notes:
     )
     ll_target = ll.add_mutually_exclusive_group(required=True)
     ll_target.add_argument(
-        "--folder", type=str, help="Folder ID — list all lists inside this folder"
+        "--folder",
+        metavar="FOLDER_ID",
+        type=str,
+        help="Raw ClickUp folder ID — list all lists inside this folder",
     )
     ll_target.add_argument(
         "--space",
+        metavar="SPACE_NAME_OR_ID",
         type=str,
-        help="Space name or ID — list folderless lists in this space",
+        help="Space name (from config) or raw ClickUp space ID — list folderless lists",
     )
 
     # lists get
@@ -119,12 +123,16 @@ notes:
     )
     lc_target = lc.add_mutually_exclusive_group(required=True)
     lc_target.add_argument(
-        "--folder", type=str, help="Folder ID — create list inside this folder"
+        "--folder",
+        metavar="FOLDER_ID",
+        type=str,
+        help="Raw ClickUp folder ID — create list inside this folder",
     )
     lc_target.add_argument(
         "--space",
+        metavar="SPACE_NAME_OR_ID",
         type=str,
-        help="Space name or ID — create a folderless list in this space",
+        help="Space name (from config) or raw ClickUp space ID — folderless list",
     )
     lc.add_argument("--name", required=True, help="List name (required)")
     lc.add_argument("--content", type=str, help="List description/content")

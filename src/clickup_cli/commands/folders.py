@@ -55,9 +55,10 @@ examples:
     )
     fl.add_argument(
         "--space",
+        metavar="SPACE_NAME_OR_ID",
         required=True,
         type=str,
-        help="Space name (from config) or raw space ID",
+        help="Space name (from config) or raw ClickUp space ID",
     )
 
     # folders get
@@ -101,9 +102,10 @@ examples:
     )
     fc.add_argument(
         "--space",
+        metavar="SPACE_NAME_OR_ID",
         required=True,
         type=str,
-        help="Space name (from config) or raw space ID",
+        help="Space name (from config) or raw ClickUp space ID",
     )
     fc.add_argument("--name", required=True, help="Folder name (required)")
 
