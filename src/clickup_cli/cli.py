@@ -60,9 +60,9 @@ current coverage:
   tasks     — list, get, create, update, search, delete, move, merge
   comments  — list, add, update, delete, thread, reply
   docs      — list, get, create, pages, get-page, edit-page, create-page
-  folders   — list, get, create, update, delete
-  lists     — list, get, create, update, delete
-  spaces    — list, get, statuses
+  folders   — list, get, create, update, delete, privacy
+  lists     — list, get, create, update, delete, privacy
+  spaces    — list, get, statuses, privacy
   team      — whoami, members
   tags      — list, add, remove
 

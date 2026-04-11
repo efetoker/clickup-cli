@@ -69,9 +69,9 @@ Output is JSON on stdout; errors go to stderr.
 | `tasks` | list, get, create, update, search, delete, move, merge, depend | Full task CRUD + dependencies |
 | `comments` | list, add, update, delete, thread, reply | Full comment CRUD with threading |
 | `docs` | list, get, create, pages, get-page, edit-page, create-page | Docs and page management |
-| `folders` | list, get, create, update, delete | Folder CRUD |
-| `lists` | list, get, create, update, delete | List CRUD |
-| `spaces` | list, get, statuses | Space inspection |
+| `folders` | list, get, create, update, delete, privacy | Folder CRUD + privacy toggle |
+| `lists` | list, get, create, update, delete, privacy | List CRUD + privacy toggle |
+| `spaces` | list, get, statuses, privacy | Space inspection + privacy toggle |
 | `team` | whoami, members | Workspace and member info |
 | `tags` | list, add, remove | Tag management |
 

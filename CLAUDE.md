@@ -17,9 +17,9 @@ src/clickup_cli/
     ├── tasks.py     # tasks parser + handlers (list/get/create/update/search/delete/move/merge/depend)
     ├── comments.py  # comments parser + handlers (list/add/update/delete/thread/reply)
     ├── docs.py      # docs parser + handlers (list/get/create/pages/get-page/edit-page/create-page)
-    ├── folders.py   # folders parser + handlers (list/get/create/update/delete)
-    ├── lists.py     # lists parser + handlers (list/get/create/update/delete)
-    ├── spaces.py    # spaces parser + handlers (list/get/statuses)
+    ├── folders.py   # folders parser + handlers (list/get/create/update/delete/privacy)
+    ├── lists.py     # lists parser + handlers (list/get/create/update/delete/privacy)
+    ├── spaces.py    # spaces parser + handlers (list/get/statuses/privacy)
     ├── tags.py      # tags parser + handlers (list/add/remove)
     ├── team.py      # team parser + handlers (whoami/members)
     └── init.py      # clickup init setup command
