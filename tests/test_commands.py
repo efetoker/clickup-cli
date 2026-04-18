@@ -1394,6 +1394,13 @@ class TasksSearchBehaviorTests(unittest.TestCase):
             cmd_tasks_search(client, args)
         self.assertFalse(any(call["path"].endswith("/task") for call in client.calls))
 
+    def test_space_scoping_errors_for_unknown_space_alias(self):
+        client = FlexClient(responses={"/task": {"tasks": [], "last_page": True}})
+        args = self._make_search_args(space="nope")
+        with self.assertRaises(SystemExit):
+            cmd_tasks_search(client, args)
+        self.assertFalse(any(call["path"].endswith("/task") for call in client.calls))
+
     def test_search_help_describes_space_scope_as_whole_space(self):
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="group")
