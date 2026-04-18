@@ -691,25 +691,30 @@ def _resolve_space_id(space_arg):
     error(f"Unknown space: {space_arg}. Check your config file.")
 
 
-def _resolve_scope_list_ids(client, space_arg):
+def _resolve_scope_list_ids(client, space_arg, include_archived=False, allow_empty=False):
     """Resolve --space to every list ID in that space for search scoping."""
     space_id = _resolve_space_id(space_arg)
+    params = {"archived": "true"} if include_archived else None
 
-    folderless_resp = client.get_v2(f"/space/{space_id}/list", allow_dry_run=True)
+    folderless_resp = client.get_v2(
+        f"/space/{space_id}/list", params=params, allow_dry_run=True
+    )
     folderless_lists = folderless_resp.get("lists", [])
 
-    folder_resp = client.get_v2(f"/space/{space_id}/folder", allow_dry_run=True)
+    folder_resp = client.get_v2(
+        f"/space/{space_id}/folder", params=params, allow_dry_run=True
+    )
     folders = folder_resp.get("folders", [])
 
     list_ids = [item["id"] for item in folderless_lists]
     for folder in folders:
         folder_lists_resp = client.get_v2(
-            f"/folder/{folder['id']}/list", allow_dry_run=True
+            f"/folder/{folder['id']}/list", params=params, allow_dry_run=True
         )
         list_ids.extend(item["id"] for item in folder_lists_resp.get("lists", []))
 
     list_ids = list(dict.fromkeys(list_ids))
-    if not list_ids:
+    if not list_ids and not allow_empty:
         error(
             f"Space {space_arg} has no lists available for search scoping. "
             "Pass --list <list_id> or --folder <folder_id> instead."
@@ -927,10 +932,7 @@ def cmd_tasks_search(client, args):
         resolved_space_list_ids = _resolve_scope_list_ids(client, args.space)
 
     if client.dry_run:
-        result = {"dry_run": True, "action": "search_tasks", "query": args.query}
-        if resolved_space_list_ids is not None:
-            result["resolved_list_ids"] = resolved_space_list_ids
-        return result
+        return {"dry_run": True, "action": "search_tasks", "query": args.query}
 
     # Auto-apply --name-prefix when query looks like a task ID (e.g. PROJ-39)
     name_prefix = getattr(args, "name_prefix", None)
@@ -952,6 +954,16 @@ def cmd_tasks_search(client, args):
     if getattr(args, "include_archived", False):
         archived_params = dict(params)
         archived_params["archived"] = "true"
+        if resolved_space_list_ids is not None:
+            archived_list_ids = _resolve_scope_list_ids(
+                client,
+                args.space,
+                include_archived=True,
+                allow_empty=True,
+            )
+            archived_params["list_ids[]"] = list(
+                dict.fromkeys(resolved_space_list_ids + archived_list_ids)
+            )
         all_tasks.extend(
             _paginate_tasks(client, f"/team/{WORKSPACE_ID}/task", archived_params)
         )

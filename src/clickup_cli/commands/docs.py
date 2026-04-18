@@ -314,10 +314,7 @@ def cmd_docs_list(client, args):
     resolved_space_id = resolve_space_id(args.space) if args.space else None
 
     if client.dry_run:
-        result = {"dry_run": True, "action": "list_docs", "space": getattr(args, "space", None)}
-        if resolved_space_id is not None:
-            result["resolved_space_id"] = resolved_space_id
-        return result
+        return {"dry_run": True, "action": "list_docs", "space": getattr(args, "space", None)}
 
     params = {"limit": "100"}
     if resolved_space_id is not None:

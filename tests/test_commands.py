@@ -311,6 +311,17 @@ class DocsListTests(unittest.TestCase):
         result = cmd_docs_list(client, args)
         self.assertTrue(result["dry_run"])
 
+    def test_dry_run_preserves_original_envelope_with_space(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(space="111")
+
+        result = cmd_docs_list(client, args)
+
+        self.assertEqual(
+            result,
+            {"dry_run": True, "action": "list_docs", "space": "111"},
+        )
+
     def test_dry_run_with_invalid_space_name_fails_before_preview(self):
         client = FlexClient(dry_run=True)
         args = Namespace(space="badname")
@@ -1486,6 +1497,23 @@ class TasksSearchBehaviorTests(unittest.TestCase):
 
         self.assertEqual(client.calls, [])
 
+    def test_dry_run_preserves_original_envelope_with_active_space(self):
+        client = FlexClient(
+            dry_run=True,
+            responses={
+                "/space/111/list": {"lists": [{"id": "folderless-1"}]},
+                "/space/111/folder": {"folders": []},
+            },
+        )
+        args = self._make_search_args(space="111")
+
+        result = cmd_tasks_search(client, args)
+
+        self.assertEqual(
+            result,
+            {"dry_run": True, "action": "search_tasks", "query": "bug"},
+        )
+
     def test_search_help_describes_space_scope_as_whole_space(self):
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="group")
@@ -1753,6 +1781,89 @@ class TasksIncludeArchivedTests(unittest.TestCase):
         self.assertEqual(len(get_calls), 2)
         archived_flags = [c["params"].get("archived") for c in get_calls]
         self.assertIn("true", archived_flags)
+
+    def test_search_space_scope_include_archived_uses_archived_lists_and_folders(self):
+        def _space_lists(path, kwargs):
+            params = kwargs.get("params") or {}
+            archived = params.get("archived")
+            if archived == "true":
+                return {"lists": [{"id": "archived-folderless"}]}
+            return {"lists": [{"id": "active-folderless"}]}
+
+        def _space_folders(path, kwargs):
+            params = kwargs.get("params") or {}
+            archived = params.get("archived")
+            if archived == "true":
+                return {"folders": [{"id": "archived-folder"}]}
+            return {"folders": [{"id": "active-folder"}]}
+
+        def _folder_lists(path, kwargs):
+            if "/folder/active-folder/list" in path:
+                return {"lists": [{"id": "active-folder-list"}]}
+            if "/folder/archived-folder/list" in path:
+                return {"lists": [{"id": "archived-folder-list"}]}
+            return {"lists": []}
+
+        def _tasks(path, kwargs):
+            list_ids = kwargs.get("params", {}).get("list_ids[]", [])
+            archived = kwargs.get("params", {}).get("archived")
+            if archived == "true":
+                return {
+                    "tasks": [
+                        {
+                            "id": "+".join(list_ids),
+                            "name": "archived task",
+                            "status": {"status": "open"},
+                            "priority": None,
+                            "url": "u",
+                        }
+                    ],
+                    "last_page": True,
+                }
+            return {
+                "tasks": [
+                    {
+                        "id": "+".join(list_ids),
+                        "name": "live task",
+                        "status": {"status": "open"},
+                        "priority": None,
+                        "url": "u",
+                    }
+                ],
+                "last_page": True,
+            }
+
+        client = FlexClient(
+            responses={
+                "/space/111/list": _space_lists,
+                "/space/111/folder": _space_folders,
+                "/folder/": _folder_lists,
+                "/task": _tasks,
+            }
+        )
+        args = Namespace(
+            query="bug",
+            include_closed=False,
+            include_archived=True,
+            space="111",
+            list_id=None,
+            folder_id=None,
+            name_prefix=None,
+            tags=None,
+            fields=None,
+            full=False,
+        )
+
+        result = cmd_tasks_search(client, args)
+
+        task_ids = {task["id"] for task in result["tasks"]}
+        self.assertEqual(
+            task_ids,
+            {
+                "active-folderless+active-folder-list",
+                "active-folderless+active-folder-list+archived-folderless+archived-folder-list",
+            },
+        )
 
 
 # ─── CLI dispatch ─────────────────────────────────────────────────────────
