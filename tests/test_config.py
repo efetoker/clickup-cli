@@ -283,6 +283,17 @@ class SaveFieldToConfigTests(unittest.TestCase):
         finally:
             os.unlink(tmp)
 
+    @patch("clickup_cli.config.os.chmod")
+    def test_reapplies_owner_only_permissions_after_rewrite(self, mock_chmod):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"api_token": "pk_test"}, f)
+            tmp = f.name
+        try:
+            _save_field_to_config(tmp, "workspace_id", "99999")
+            mock_chmod.assert_called_once_with(tmp, 0o600)
+        finally:
+            os.unlink(tmp)
+
     def test_bad_path_does_not_crash(self):
         # Non-critical — should silently fail
         _save_field_to_config("/nonexistent/path/config.json", "key", "val")

@@ -1656,6 +1656,38 @@ class InitTokenFlagTests(unittest.TestCase):
         # Should NOT have called input() — token was provided via flag
         self.assertEqual(mock_get.call_count, 2)
 
+    @patch("clickup_cli.commands.init.os.chmod")
+    @patch("clickup_cli.commands.init.os.makedirs")
+    @patch("clickup_cli.commands.init.requests.get")
+    def test_token_flag_hardens_config_directory_and_file(
+        self, mock_get, mock_makedirs, mock_chmod
+    ):
+        """Init hardens the config directory and written config file."""
+        mock_team_resp = MagicMock()
+        mock_team_resp.status_code = 200
+        mock_team_resp.ok = True
+        mock_team_resp.json.return_value = {
+            "teams": [{
+                "id": "ws1", "name": "TestWS",
+                "members": [{"user": {"id": "u1", "username": "testuser"}}]
+            }]
+        }
+
+        mock_spaces_resp = MagicMock()
+        mock_spaces_resp.status_code = 200
+        mock_spaces_resp.ok = True
+        mock_spaces_resp.json.return_value = {"spaces": []}
+        mock_get.side_effect = [mock_team_resp, mock_spaces_resp]
+
+        args = Namespace(token="pk_test_123")
+        with patch("builtins.open", unittest.mock.mock_open()):
+            cmd_init(args)
+
+        mock_makedirs.assert_called_once_with(
+            unittest.mock.ANY, mode=0o700, exist_ok=True
+        )
+        mock_chmod.assert_called_once_with(unittest.mock.ANY, 0o600)
+
 
 class InitErrorTests(unittest.TestCase):
     """Tests for cmd_init error paths."""
