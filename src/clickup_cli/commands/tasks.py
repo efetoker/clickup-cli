@@ -946,14 +946,20 @@ def cmd_tasks_search(client, args):
     params = {"search": args.query}
     if args.include_closed:
         params["include_closed"] = "true"
+    run_active_search = True
     if hasattr(args, "list_id") and args.list_id:
         params["list_ids[]"] = args.list_id
     elif hasattr(args, "folder_id") and args.folder_id:
         params["project_ids[]"] = args.folder_id
     elif resolved_space_list_ids is not None:
-        params["list_ids[]"] = resolved_space_list_ids
+        if resolved_space_list_ids:
+            params["list_ids[]"] = resolved_space_list_ids
+        else:
+            run_active_search = False
 
-    all_tasks = _paginate_tasks(client, f"/team/{WORKSPACE_ID}/task", params)
+    all_tasks = []
+    if run_active_search:
+        all_tasks = _paginate_tasks(client, f"/team/{WORKSPACE_ID}/task", params)
 
     if getattr(args, "include_archived", False):
         archived_params = dict(params)

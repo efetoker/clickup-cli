@@ -1925,13 +1925,14 @@ class TasksIncludeArchivedTests(unittest.TestCase):
         result = cmd_tasks_search(client, args)
 
         task_ids = {task["id"] for task in result["tasks"]}
-        self.assertEqual(
-            task_ids,
-            {
-                "active:unscoped",
-                "true:archived-folderless+archived-folder-list",
-            },
-        )
+        self.assertEqual(task_ids, {"true:archived-folderless+archived-folder-list"})
+        task_calls = [
+            call
+            for call in client.calls
+            if call["method"] == "GET" and call["path"].endswith("/task")
+        ]
+        self.assertEqual(len(task_calls), 1)
+        self.assertEqual(task_calls[0]["params"].get("archived"), "true")
 
 
 # ─── CLI dispatch ─────────────────────────────────────────────────────────
