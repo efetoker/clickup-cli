@@ -1,6 +1,7 @@
 """Folder command handlers — list, get, create, update, delete, privacy."""
 
 from ..helpers import error, resolve_space_id, add_id_argument
+from .privacy import handle_privacy_request, register_privacy_subcommand
 
 
 def register_parser(subparsers, F):
@@ -157,11 +158,12 @@ examples:
     )
     add_id_argument(fd, "folder_id", "ClickUp folder ID to delete")
 
-    # folders privacy
-    fp = folders_sub.add_parser(
-        "privacy",
-        formatter_class=F,
-        help="Make a folder private or public",
+    register_privacy_subcommand(
+        folders_sub,
+        F,
+        object_type="folder",
+        id_argument="folder_id",
+        id_help="ClickUp folder ID",
         description="""\
 Toggle the privacy of a folder via the v3 ACLs endpoint. This flips the
 private/public boolean only — it does not grant or revoke individual
@@ -183,14 +185,6 @@ examples:
 
 notes:
   Hits PATCH /v3/workspaces/{wid}/folder/{id}/acls.""",
-    )
-    add_id_argument(fp, "folder_id", "ClickUp folder ID")
-    fp_mode = fp.add_mutually_exclusive_group(required=True)
-    fp_mode.add_argument(
-        "--private", action="store_true", help="Make this folder private"
-    )
-    fp_mode.add_argument(
-        "--public", action="store_true", help="Make this folder public"
     )
 
 
@@ -244,24 +238,23 @@ def cmd_folders_delete(client, args):
 
 def cmd_folders_privacy(client, args):
     """Set a folder private or public via the v3 ACLs endpoint."""
-    private = bool(args.private)
-    body = {"private": private}
-    path = f"/workspaces/{client.runtime.workspace_id}/folder/{args.folder_id}/acls"
+    return handle_privacy_request(
+        client,
+        args,
+        object_type="folder",
+        object_id=args.folder_id,
+        path_segment="folder",
+    )
 
-    if client.dry_run:
-        return {
-            "dry_run": True,
-            "action": "set_privacy",
-            "object_type": "folder",
-            "object_id": args.folder_id,
-            "body": body,
-        }
-
-    client.patch_v3(path, data=body)
-    return {
-        "status": "ok",
-        "action": "set_privacy",
-        "object_type": "folder",
-        "object_id": args.folder_id,
-        "private": private,
-    }
+COMMAND_MANIFEST = {
+    "group": "folders",
+    "register_parser": register_parser,
+    "handlers": {
+        "list": cmd_folders_list,
+        "get": cmd_folders_get,
+        "create": cmd_folders_create,
+        "update": cmd_folders_update,
+        "delete": cmd_folders_delete,
+        "privacy": cmd_folders_privacy,
+    },
+}

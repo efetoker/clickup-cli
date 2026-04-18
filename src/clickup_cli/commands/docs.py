@@ -443,3 +443,17 @@ def cmd_docs_create_page(client, args):
         f"/workspaces/{client.runtime.workspace_id}/docs/{args.doc_id}/pages",
         data=body,
     )
+
+COMMAND_MANIFEST = {
+    "group": "docs",
+    "register_parser": register_parser,
+    "handlers": {
+        "list": cmd_docs_list,
+        "get": cmd_docs_get,
+        "create": cmd_docs_create,
+        "pages": cmd_docs_pages,
+        "get-page": cmd_docs_get_page,
+        "edit-page": cmd_docs_edit_page,
+        "create-page": cmd_docs_create_page,
+    },
+}

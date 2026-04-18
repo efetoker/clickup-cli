@@ -3,6 +3,14 @@
 from ..helpers import read_content, error, fetch_all_comments, add_id_argument
 
 
+def _comment_body(args, *, empty_message):
+    """Build the shared request body for comment creation flows."""
+    text = read_content(args.text, args.file, "--text")
+    if not text:
+        error(empty_message)
+    return {"comment_text": text, "notify_all": False}
+
+
 def register_parser(subparsers, F):
     """Register all comments subcommands on the given subparsers object."""
     comments_parser = subparsers.add_parser(
@@ -229,10 +237,7 @@ def cmd_comments_list(client, args):
 
 
 def cmd_comments_add(client, args):
-    text = read_content(args.text, args.file, "--text")
-    if not text:
-        error("Provide comment text via --text or --file")
-    body = {"comment_text": text, "notify_all": False}
+    body = _comment_body(args, empty_message="Provide comment text via --text or --file")
     return client.post_v2(f"/task/{args.task_id}/comment", data=body)
 
 
@@ -269,10 +274,20 @@ def cmd_comments_thread(client, args):
 
 def cmd_comments_reply(client, args):
     """Reply to a comment (threaded)."""
-    text = read_content(args.text, args.file, "--text")
-    if not text:
-        error("Provide reply text via --text or --file")
-    body = {"comment_text": text, "notify_all": False}
+    body = _comment_body(args, empty_message="Provide reply text via --text or --file")
     if client.dry_run:
         return {"dry_run": True, "action": "reply", "comment_id": args.comment_id, "body": body}
     return client.post_v2(f"/comment/{args.comment_id}/reply", data=body)
+
+COMMAND_MANIFEST = {
+    "group": "comments",
+    "register_parser": register_parser,
+    "handlers": {
+        "list": cmd_comments_list,
+        "add": cmd_comments_add,
+        "update": cmd_comments_update,
+        "delete": cmd_comments_delete,
+        "thread": cmd_comments_thread,
+        "reply": cmd_comments_reply,
+    },
+}

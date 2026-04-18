@@ -1,78 +1,27 @@
-"""Command handler registry — maps dispatch keys to handler functions."""
+"""Command manifest registry and derived handler map."""
 
-from .tasks import (
-    cmd_tasks_list, cmd_tasks_get, cmd_tasks_create,
-    cmd_tasks_update, cmd_tasks_search,
-    cmd_tasks_delete, cmd_tasks_move, cmd_tasks_merge,
-    cmd_tasks_depend,
-)
-from .comments import (
-    cmd_comments_list, cmd_comments_add,
-    cmd_comments_update, cmd_comments_delete,
-    cmd_comments_thread, cmd_comments_reply,
-)
-from .docs import (
-    cmd_docs_list, cmd_docs_get, cmd_docs_create, cmd_docs_pages,
-    cmd_docs_get_page, cmd_docs_edit_page, cmd_docs_create_page,
-)
-from .spaces import (
-    cmd_spaces_list, cmd_spaces_get, cmd_spaces_statuses, cmd_spaces_privacy,
-)
-from .team import cmd_team_whoami, cmd_team_members
-from .tags import cmd_tags_list, cmd_tags_add, cmd_tags_remove
-from .folders import (
-    cmd_folders_list, cmd_folders_get, cmd_folders_create,
-    cmd_folders_update, cmd_folders_delete, cmd_folders_privacy,
-)
-from .lists import (
-    cmd_lists_list, cmd_lists_get, cmd_lists_create,
-    cmd_lists_update, cmd_lists_delete, cmd_lists_privacy,
-)
+from .comments import COMMAND_MANIFEST as COMMENTS_COMMAND_MANIFEST
+from .docs import COMMAND_MANIFEST as DOCS_COMMAND_MANIFEST
+from .folders import COMMAND_MANIFEST as FOLDERS_COMMAND_MANIFEST
+from .lists import COMMAND_MANIFEST as LISTS_COMMAND_MANIFEST
+from .spaces import COMMAND_MANIFEST as SPACES_COMMAND_MANIFEST
+from .tags import COMMAND_MANIFEST as TAGS_COMMAND_MANIFEST
+from .tasks import COMMAND_MANIFEST as TASKS_COMMAND_MANIFEST
+from .team import COMMAND_MANIFEST as TEAM_COMMAND_MANIFEST
 
-# Keys use f"{args.group}_{args.command}" format from dispatch().
-# Some keys retain hyphens matching argparse subparser names.
+COMMAND_MANIFESTS = [
+    TASKS_COMMAND_MANIFEST,
+    COMMENTS_COMMAND_MANIFEST,
+    DOCS_COMMAND_MANIFEST,
+    FOLDERS_COMMAND_MANIFEST,
+    LISTS_COMMAND_MANIFEST,
+    SPACES_COMMAND_MANIFEST,
+    TAGS_COMMAND_MANIFEST,
+    TEAM_COMMAND_MANIFEST,
+]
+
 HANDLERS = {
-    "tasks_list": cmd_tasks_list,
-    "tasks_get": cmd_tasks_get,
-    "tasks_create": cmd_tasks_create,
-    "tasks_update": cmd_tasks_update,
-    "tasks_search": cmd_tasks_search,
-    "tasks_delete": cmd_tasks_delete,
-    "tasks_move": cmd_tasks_move,
-    "tasks_merge": cmd_tasks_merge,
-    "tasks_depend": cmd_tasks_depend,
-    "comments_list": cmd_comments_list,
-    "comments_add": cmd_comments_add,
-    "comments_update": cmd_comments_update,
-    "comments_delete": cmd_comments_delete,
-    "comments_thread": cmd_comments_thread,
-    "comments_reply": cmd_comments_reply,
-    "docs_list": cmd_docs_list,
-    "docs_get": cmd_docs_get,
-    "docs_create": cmd_docs_create,
-    "docs_pages": cmd_docs_pages,
-    "docs_get-page": cmd_docs_get_page,
-    "docs_edit-page": cmd_docs_edit_page,
-    "docs_create-page": cmd_docs_create_page,
-    "spaces_list": cmd_spaces_list,
-    "spaces_get": cmd_spaces_get,
-    "spaces_statuses": cmd_spaces_statuses,
-    "spaces_privacy": cmd_spaces_privacy,
-    "team_whoami": cmd_team_whoami,
-    "team_members": cmd_team_members,
-    "tags_list": cmd_tags_list,
-    "tags_add": cmd_tags_add,
-    "tags_remove": cmd_tags_remove,
-    "folders_list": cmd_folders_list,
-    "folders_get": cmd_folders_get,
-    "folders_create": cmd_folders_create,
-    "folders_update": cmd_folders_update,
-    "folders_delete": cmd_folders_delete,
-    "folders_privacy": cmd_folders_privacy,
-    "lists_list": cmd_lists_list,
-    "lists_get": cmd_lists_get,
-    "lists_create": cmd_lists_create,
-    "lists_update": cmd_lists_update,
-    "lists_delete": cmd_lists_delete,
-    "lists_privacy": cmd_lists_privacy,
+    f"{manifest['group']}_{command}": handler
+    for manifest in COMMAND_MANIFESTS
+    for command, handler in manifest["handlers"].items()
 }

@@ -130,3 +130,13 @@ def cmd_tags_add(client, args):
 def cmd_tags_remove(client, args):
     """Remove a tag from a task."""
     return _tag_action(client, args, client.delete_v2, "remove_tag", "tag_removed")
+
+COMMAND_MANIFEST = {
+    "group": "tags",
+    "register_parser": register_parser,
+    "handlers": {
+        "list": cmd_tags_list,
+        "add": cmd_tags_add,
+        "remove": cmd_tags_remove,
+    },
+}

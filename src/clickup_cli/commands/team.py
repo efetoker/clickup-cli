@@ -110,3 +110,12 @@ def cmd_team_members(client, args):
         "members": [_format_member(m) for m in members],
         "count": len(members),
     }
+
+COMMAND_MANIFEST = {
+    "group": "team",
+    "register_parser": register_parser,
+    "handlers": {
+        "whoami": cmd_team_whoami,
+        "members": cmd_team_members,
+    },
+}

@@ -553,25 +553,45 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.command, "statuses")
         self.assertEqual(args.space, "myspace")
 
-    def test_spaces_privacy_private(self):
-        args = self._parse(["spaces", "privacy", "myspace", "--private"])
-        self.assertEqual(args.command, "privacy")
-        self.assertEqual(args.space, "myspace")
-        self.assertTrue(args.private)
-        self.assertFalse(args.public)
+    def test_privacy_private(self):
+        cases = [
+            ("spaces", "space", "myspace"),
+            ("folders", "folder_id", "f123"),
+            ("lists", "list_id", "l123"),
+        ]
 
-    def test_spaces_privacy_public(self):
-        args = self._parse(["spaces", "privacy", "myspace", "--public"])
-        self.assertTrue(args.public)
-        self.assertFalse(args.private)
+        for group, arg_name, object_id in cases:
+            with self.subTest(group=group):
+                args = self._parse([group, "privacy", object_id, "--private"])
+                self.assertEqual(args.command, "privacy")
+                self.assertEqual(getattr(args, arg_name), object_id)
+                self.assertTrue(args.private)
+                self.assertFalse(args.public)
 
-    def test_spaces_privacy_requires_mode(self):
-        with self.assertRaises(SystemExit):
-            self._parse(["spaces", "privacy", "myspace"])
+    def test_privacy_public(self):
+        cases = [
+            ("spaces", "space", "myspace"),
+            ("folders", "folder_id", "f123"),
+            ("lists", "list_id", "l123"),
+        ]
 
-    def test_spaces_privacy_rejects_both_modes(self):
-        with self.assertRaises(SystemExit):
-            self._parse(["spaces", "privacy", "myspace", "--private", "--public"])
+        for group, _, object_id in cases:
+            with self.subTest(group=group):
+                args = self._parse([group, "privacy", object_id, "--public"])
+                self.assertTrue(args.public)
+                self.assertFalse(args.private)
+
+    def test_privacy_requires_mode(self):
+        for group, object_id in [("spaces", "myspace"), ("folders", "f123"), ("lists", "l123")]:
+            with self.subTest(group=group):
+                with self.assertRaises(SystemExit):
+                    self._parse([group, "privacy", object_id])
+
+    def test_privacy_rejects_both_modes(self):
+        for group, object_id in [("spaces", "myspace"), ("folders", "f123"), ("lists", "l123")]:
+            with self.subTest(group=group):
+                with self.assertRaises(SystemExit):
+                    self._parse([group, "privacy", object_id, "--private", "--public"])
 
     # --- folders ---
 
@@ -599,42 +619,6 @@ class ParserComprehensiveTests(unittest.TestCase):
         args = self._parse(["folders", "delete", "f123"])
         self.assertEqual(args.command, "delete")
         self.assertEqual(args.folder_id, "f123")
-
-    def test_folders_privacy_private(self):
-        args = self._parse(["folders", "privacy", "f123", "--private"])
-        self.assertEqual(args.command, "privacy")
-        self.assertEqual(args.folder_id, "f123")
-        self.assertTrue(args.private)
-
-    def test_folders_privacy_public(self):
-        args = self._parse(["folders", "privacy", "f123", "--public"])
-        self.assertTrue(args.public)
-
-    def test_folders_privacy_requires_mode(self):
-        with self.assertRaises(SystemExit):
-            self._parse(["folders", "privacy", "f123"])
-
-    def test_folders_privacy_rejects_both_modes(self):
-        with self.assertRaises(SystemExit):
-            self._parse(["folders", "privacy", "f123", "--private", "--public"])
-
-    def test_lists_privacy_private(self):
-        args = self._parse(["lists", "privacy", "l123", "--private"])
-        self.assertEqual(args.command, "privacy")
-        self.assertEqual(args.list_id, "l123")
-        self.assertTrue(args.private)
-
-    def test_lists_privacy_public(self):
-        args = self._parse(["lists", "privacy", "l123", "--public"])
-        self.assertTrue(args.public)
-
-    def test_lists_privacy_requires_mode(self):
-        with self.assertRaises(SystemExit):
-            self._parse(["lists", "privacy", "l123"])
-
-    def test_lists_privacy_rejects_both_modes(self):
-        with self.assertRaises(SystemExit):
-            self._parse(["lists", "privacy", "l123", "--private", "--public"])
 
     # --- team ---
 
@@ -970,17 +954,18 @@ class ConfigFallbackTests(unittest.TestCase):
     """Tests for config resolution."""
 
     def test_config_reset_clears_cache(self):
-        from clickup_cli.config import _reset
-        _reset()
         from clickup_cli import config
+        config._config_cache = None
         self.assertIsNone(config._config_cache)
 
     def test_config_auto_detects_workspace_when_missing(self):
         """When config has token but no workspace_id, auto-detect fills it in."""
         import json
         import tempfile
-        from clickup_cli.config import _reset, load_config
-        _reset()
+        from clickup_cli import config as config_module
+        from clickup_cli.config import load_config
+
+        config_module._config_cache = None
 
         # Create temp config with only api_token, no workspace_id
         with tempfile.NamedTemporaryFile(
@@ -999,12 +984,12 @@ class ConfigFallbackTests(unittest.TestCase):
 
             with patch.dict(os.environ, {"CLICKUP_CONFIG_PATH": tmp_path}):
                 with patch("requests.get", return_value=mock_resp):
-                    config = load_config()
+                    loaded_config = load_config()
 
-            self.assertEqual(config["workspace_id"], "12345")
+            self.assertEqual(loaded_config["workspace_id"], "12345")
         finally:
             os.unlink(tmp_path)
-            _reset()
+            config_module._config_cache = None
 
 
 class PreCreateDedupTests(unittest.TestCase):
@@ -1217,7 +1202,7 @@ class MainFunctionTests(unittest.TestCase):
         },
     )
     def test_main_normal_dispatch_calls_output(self, mock_config, mock_client_cls,
-                                                 mock_dispatch, mock_output):
+                                                  mock_dispatch, mock_output):
         """Normal dispatch path: result is not None, output() is called."""
         from clickup_cli.cli import main
         main()
@@ -1226,6 +1211,20 @@ class MainFunctionTests(unittest.TestCase):
         self.assertEqual(runtime.user_id, "user_456")
         self.assertEqual(runtime.spaces, {"dev": {"space_id": "space_789"}})
         mock_output.assert_called_once_with({"tasks": []}, pretty=False)
+
+
+class BuildParserManifestTests(unittest.TestCase):
+    def test_build_parser_registers_command_groups_from_manifests(self):
+        def register_sentinel(subparsers, formatter_class):
+            subparsers.add_parser("sentinel", formatter_class=formatter_class)
+
+        with patch(
+            "clickup_cli.commands.COMMAND_MANIFESTS",
+            [{"group": "sentinel", "register_parser": register_sentinel, "handlers": {}}],
+        ):
+            parser = cli.build_parser()
+
+        self.assertIn("sentinel", parser._subparsers._group_actions[0].choices)
 
 
 if __name__ == "__main__":

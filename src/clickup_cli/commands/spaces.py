@@ -1,6 +1,7 @@
 """Space command handlers — list, get, statuses, privacy."""
 
 from ..helpers import resolve_space_id, add_id_argument
+from .privacy import handle_privacy_request, register_privacy_subcommand
 
 
 def register_parser(subparsers, F):
@@ -106,11 +107,12 @@ notes:
     )
     add_id_argument(ss, "space", "Space name (from config) or raw space ID")
 
-    # spaces privacy
-    sp = spaces_sub.add_parser(
-        "privacy",
-        formatter_class=F,
-        help="Make a space private or public",
+    register_privacy_subcommand(
+        spaces_sub,
+        F,
+        object_type="space",
+        id_argument="space",
+        id_help="Space name (from config) or raw space ID",
         description="""\
 Toggle the privacy of a space via the v3 ACLs endpoint. This flips the
 private/public boolean only — it does not grant or revoke individual
@@ -133,14 +135,6 @@ examples:
 notes:
   Accepts a configured space name or raw space ID.
   Hits PATCH /v3/workspaces/{wid}/space/{id}/acls.""",
-    )
-    add_id_argument(sp, "space", "Space name (from config) or raw space ID")
-    sp_mode = sp.add_mutually_exclusive_group(required=True)
-    sp_mode.add_argument(
-        "--private", action="store_true", help="Make this space private"
-    )
-    sp_mode.add_argument(
-        "--public", action="store_true", help="Make this space public"
     )
 
 
@@ -180,24 +174,21 @@ def cmd_spaces_statuses(client, args):
 def cmd_spaces_privacy(client, args):
     """Set a space private or public via the v3 ACLs endpoint."""
     space_id = resolve_space_id(args.space)
-    private = bool(args.private)
-    body = {"private": private}
-    path = f"/workspaces/{client.runtime.workspace_id}/space/{space_id}/acls"
+    return handle_privacy_request(
+        client,
+        args,
+        object_type="space",
+        object_id=space_id,
+        path_segment="space",
+    )
 
-    if client.dry_run:
-        return {
-            "dry_run": True,
-            "action": "set_privacy",
-            "object_type": "space",
-            "object_id": space_id,
-            "body": body,
-        }
-
-    client.patch_v3(path, data=body)
-    return {
-        "status": "ok",
-        "action": "set_privacy",
-        "object_type": "space",
-        "object_id": space_id,
-        "private": private,
-    }
+COMMAND_MANIFEST = {
+    "group": "spaces",
+    "register_parser": register_parser,
+    "handlers": {
+        "list": cmd_spaces_list,
+        "get": cmd_spaces_get,
+        "statuses": cmd_spaces_statuses,
+        "privacy": cmd_spaces_privacy,
+    },
+}

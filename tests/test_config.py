@@ -6,12 +6,12 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
+from clickup_cli import config as config_module
 from clickup_cli.config import (
     _auto_detect_workspace,
     _find_config_path,
     _load_from_env,
     _load_from_file,
-    _reset,
     _save_field_to_config,
     load_config,
 )
@@ -21,10 +21,10 @@ class LoadConfigCacheTests(unittest.TestCase):
     """Tests for config caching behavior."""
 
     def setUp(self):
-        _reset()
+        config_module._config_cache = None
 
     def tearDown(self):
-        _reset()
+        config_module._config_cache = None
 
     def test_cache_hit_returns_same_object(self):
         config1 = load_config()
@@ -33,9 +33,8 @@ class LoadConfigCacheTests(unittest.TestCase):
 
     def test_reset_clears_cache(self):
         load_config()
-        _reset()
-        from clickup_cli import config as cfg
-        self.assertIsNone(cfg._config_cache)
+        config_module._config_cache = None
+        self.assertIsNone(config_module._config_cache)
 
 
 class LoadFromEnvTests(unittest.TestCase):
@@ -194,10 +193,10 @@ class NoConfigErrorTests(unittest.TestCase):
     """Tests for load_config when no config is available anywhere."""
 
     def setUp(self):
-        _reset()
+        config_module._config_cache = None
 
     def tearDown(self):
-        _reset()
+        config_module._config_cache = None
 
     def test_no_config_found_exits(self):
         with patch.dict(os.environ, {}, clear=False):

@@ -1,6 +1,7 @@
 """List command handlers — list, get, create, update, delete, privacy."""
 
 from ..helpers import read_content, error, resolve_space_id, add_id_argument
+from .privacy import handle_privacy_request, register_privacy_subcommand
 
 
 def register_parser(subparsers, F):
@@ -198,11 +199,12 @@ examples:
     )
     add_id_argument(ld, "list_id", "ClickUp list ID to delete")
 
-    # lists privacy
-    lp = lists_sub.add_parser(
-        "privacy",
-        formatter_class=F,
-        help="Make a list private or public",
+    register_privacy_subcommand(
+        lists_sub,
+        F,
+        object_type="list",
+        id_argument="list_id",
+        id_help="ClickUp list ID",
         description="""\
 Toggle the privacy of a list via the v3 ACLs endpoint. This flips the
 private/public boolean only — it does not grant or revoke individual
@@ -224,14 +226,6 @@ examples:
 
 notes:
   Hits PATCH /v3/workspaces/{wid}/list/{id}/acls.""",
-    )
-    add_id_argument(lp, "list_id", "ClickUp list ID")
-    lp_mode = lp.add_mutually_exclusive_group(required=True)
-    lp_mode.add_argument(
-        "--private", action="store_true", help="Make this list private"
-    )
-    lp_mode.add_argument(
-        "--public", action="store_true", help="Make this list public"
     )
 
 
@@ -306,24 +300,23 @@ def cmd_lists_delete(client, args):
 
 def cmd_lists_privacy(client, args):
     """Set a list private or public via the v3 ACLs endpoint."""
-    private = bool(args.private)
-    body = {"private": private}
-    path = f"/workspaces/{client.runtime.workspace_id}/list/{args.list_id}/acls"
+    return handle_privacy_request(
+        client,
+        args,
+        object_type="list",
+        object_id=args.list_id,
+        path_segment="list",
+    )
 
-    if client.dry_run:
-        return {
-            "dry_run": True,
-            "action": "set_privacy",
-            "object_type": "list",
-            "object_id": args.list_id,
-            "body": body,
-        }
-
-    client.patch_v3(path, data=body)
-    return {
-        "status": "ok",
-        "action": "set_privacy",
-        "object_type": "list",
-        "object_id": args.list_id,
-        "private": private,
-    }
+COMMAND_MANIFEST = {
+    "group": "lists",
+    "register_parser": register_parser,
+    "handlers": {
+        "list": cmd_lists_list,
+        "get": cmd_lists_get,
+        "create": cmd_lists_create,
+        "update": cmd_lists_update,
+        "delete": cmd_lists_delete,
+        "privacy": cmd_lists_privacy,
+    },
+}

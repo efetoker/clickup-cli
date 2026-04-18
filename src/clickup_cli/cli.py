@@ -115,24 +115,10 @@ examples:
         help="ClickUp API token (skips interactive prompt)",
     )
 
-    # Register all command group parsers from their modules
-    from .commands.tasks import register_parser as tasks_register
-    from .commands.comments import register_parser as comments_register
-    from .commands.docs import register_parser as docs_register
-    from .commands.spaces import register_parser as spaces_register
-    from .commands.folders import register_parser as folders_register
-    from .commands.lists import register_parser as lists_register
-    from .commands.team import register_parser as team_register
-    from .commands.tags import register_parser as tags_register
+    from .commands import COMMAND_MANIFESTS
 
-    tasks_register(subparsers, F)
-    comments_register(subparsers, F)
-    docs_register(subparsers, F)
-    spaces_register(subparsers, F)
-    folders_register(subparsers, F)
-    lists_register(subparsers, F)
-    team_register(subparsers, F)
-    tags_register(subparsers, F)
+    for manifest in COMMAND_MANIFESTS:
+        manifest["register_parser"](subparsers, F)
 
     return parser
 
