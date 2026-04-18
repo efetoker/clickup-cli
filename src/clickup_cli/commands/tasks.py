@@ -148,6 +148,11 @@ notes:
         action="store_true",
         help="Return full raw API response (default is compact: id, name, status, priority, url)",
     )
+    tl.add_argument(
+        "--all-pages",
+        action="store_true",
+        help="Fetch every task page instead of the default bounded aggregate scan",
+    )
 
     # tasks get
     tg = tasks_sub.add_parser(
@@ -157,18 +162,22 @@ notes:
         description="""\
 Fetch a single task by its ClickUp task ID.
 
-By default, comments are fetched and appended to the task output under
-a "comments" key (array of {id, comment_text, user, date}) and a
-"comment_count" field. This ensures task context is always complete
-without needing a separate comments list call.
+By default, the first comment page is fetched and appended to the task
+output under a "comments" key (array of {id, comment_text, user, date})
+and a "comment_count" field. Completeness metadata shows whether that
+comment slice is complete or truncated.
 
-Use --no-comments to suppress comment fetching if output is too verbose
-or you only need the task fields.""",
+Use --all-comments to fetch every comment page explicitly, or
+--no-comments to suppress comment fetching if output is too verbose or
+you only need the task fields.""",
         epilog="""\
 returns:
   One task JSON object with all fields, plus:
     "comments": [{id, comment_text, user, date}, ...]
     "comment_count": N
+
+  Also includes: "comment_count_returned", "comments_complete",
+  and "comments_truncated".
 
   With --no-comments, returns the raw task object without comments.
 
@@ -178,10 +187,16 @@ examples:
   clickup tasks get abc123 --no-comments""",
     )
     add_id_argument(tg, "task_id", "ClickUp task ID")
-    tg.add_argument(
+    comment_mode = tg.add_mutually_exclusive_group()
+    comment_mode.add_argument(
         "--no-comments",
         action="store_true",
-        help="Skip auto-fetching comments (default: comments included)",
+        help="Skip comment hydration and return the raw task object",
+    )
+    comment_mode.add_argument(
+        "--all-comments",
+        action="store_true",
+        help="Fetch every comment page instead of the default bounded slice",
     )
 
     # tasks create
@@ -444,6 +459,11 @@ notes:
         action="store_true",
         help="Return full raw API response (default is compact: id, name, status, priority, url)",
     )
+    ts.add_argument(
+        "--all-pages",
+        action="store_true",
+        help="Fetch every search results page instead of the default bounded aggregate scan",
+    )
 
     # tasks delete
     td = tasks_sub.add_parser(
@@ -617,6 +637,7 @@ examples:
     add_id_argument(tdpl, "task_id", "ClickUp task ID")
 
 PRIORITY_MAP = {"urgent": 1, "high": 2, "normal": 3, "low": 4}
+DEFAULT_TASK_PAGE_BUDGET = 2
 
 # Pattern for task ID queries like PROJ-39, BUG-12
 _TASK_ID_PATTERN = re.compile(r"^[A-Z]+-\d+$")
@@ -636,6 +657,14 @@ def _format_and_wrap(tasks, args):
     full = getattr(args, "full", False)
     formatted = format_tasks(tasks, full=full, fields=fields)
     return {"tasks": formatted, "count": len(formatted)}
+
+
+def _budget_metadata(pages_fetched, complete):
+    return {
+        "pages_fetched": pages_fetched,
+        "results_complete": complete,
+        "results_truncated": not complete,
+    }
 
 
 def _resolve_priority(priority_arg):
@@ -716,19 +745,30 @@ def _resolve_scope_list_ids(client, space_arg, include_archived=False, allow_emp
     return list_ids
 
 
-def _paginate_tasks(client, path, params):
-    """Fetch all task pages from a paginated v2 endpoint."""
+def _paginate_tasks(client, path, params, budget=None):
+    """Fetch task pages from a paginated v2 endpoint with an optional budget."""
     all_tasks = []
     page = 0
+    pages_fetched = 0
+    complete = True
     while True:
+        if budget is not None and budget["remaining"] <= 0:
+            complete = False
+            break
         params["page"] = str(page)
         resp = client.get_v2(path, params=params)
+        pages_fetched += 1
+        if budget is not None:
+            budget["remaining"] -= 1
         tasks = resp.get("tasks", [])
         all_tasks.extend(tasks)
         if resp.get("last_page", False):
             break
+        if budget is not None and budget["remaining"] <= 0:
+            complete = False
+            break
         page += 1
-    return all_tasks
+    return {"tasks": all_tasks, "pages_fetched": pages_fetched, "complete": complete}
 
 
 def _filter_by_tags(tasks, tag_names):
@@ -756,16 +796,28 @@ def cmd_tasks_list(client, args):
     if tag_filter:
         params["tags[]"] = [tag.lower() for tag in tag_filter]
 
-    all_tasks = _paginate_tasks(client, f"/list/{list_id}/task", params)
+    budget = None if getattr(args, "all_pages", False) else {"remaining": DEFAULT_TASK_PAGE_BUDGET}
+    active_result = _paginate_tasks(client, f"/list/{list_id}/task", params, budget=budget)
+    all_tasks = list(active_result["tasks"])
+    total_pages = active_result["pages_fetched"]
+    complete = active_result["complete"]
 
     if getattr(args, "include_archived", False):
         archived_params = dict(params)
         archived_params["archived"] = "true"
-        all_tasks.extend(
-            _paginate_tasks(client, f"/list/{list_id}/task", archived_params)
+        archived_result = _paginate_tasks(
+            client,
+            f"/list/{list_id}/task",
+            archived_params,
+            budget=budget,
         )
+        all_tasks.extend(archived_result["tasks"])
+        total_pages += archived_result["pages_fetched"]
+        complete = complete and archived_result["complete"]
 
-    return _format_and_wrap(all_tasks, args)
+    result = _format_and_wrap(all_tasks, args)
+    result.update(_budget_metadata(total_pages, complete))
+    return result
 
 
 def cmd_tasks_get(client, args):
@@ -776,7 +828,12 @@ def cmd_tasks_get(client, args):
 
     # Auto-fetch comments and append to task output
     try:
-        all_comments = fetch_all_comments(client, args.task_id)
+        comment_result = fetch_all_comments(
+            client,
+            args.task_id,
+            all_pages=getattr(args, "all_comments", False),
+        )
+        all_comments = comment_result["comments"]
 
         # Slim down to useful fields
         task["comments"] = [
@@ -789,10 +846,16 @@ def cmd_tasks_get(client, args):
             for c in all_comments
         ]
         task["comment_count"] = len(all_comments)
+        task["comment_count_returned"] = len(all_comments)
+        task["comments_complete"] = comment_result["complete"]
+        task["comments_truncated"] = comment_result["truncated"]
     except (requests.RequestException, KeyError, ValueError) as e:
         print(f"warning: could not fetch comments: {e}", file=sys.stderr)
         task["comments"] = []
         task["comment_count"] = 0
+        task["comment_count_returned"] = 0
+        task["comments_complete"] = False
+        task["comments_truncated"] = False
 
     return task
 
@@ -952,8 +1015,19 @@ def cmd_tasks_search(client, args):
             run_active_search = False
 
     all_tasks = []
+    budget = None if getattr(args, "all_pages", False) else {"remaining": DEFAULT_TASK_PAGE_BUDGET}
+    total_pages = 0
+    complete = True
     if run_active_search:
-        all_tasks = _paginate_tasks(client, f"/team/{client.runtime.workspace_id}/task", params)
+        active_result = _paginate_tasks(
+            client,
+            f"/team/{client.runtime.workspace_id}/task",
+            params,
+            budget=budget,
+        )
+        all_tasks = list(active_result["tasks"])
+        total_pages += active_result["pages_fetched"]
+        complete = active_result["complete"]
 
     if getattr(args, "include_archived", False):
         archived_params = dict(params)
@@ -974,9 +1048,17 @@ def cmd_tasks_search(client, args):
             else:
                 run_archived_search = False
         if run_archived_search:
-            all_tasks.extend(
-                _paginate_tasks(client, f"/team/{client.runtime.workspace_id}/task", archived_params)
+            archived_result = _paginate_tasks(
+                client,
+                f"/team/{client.runtime.workspace_id}/task",
+                archived_params,
+                budget=budget,
             )
+            all_tasks.extend(archived_result["tasks"])
+            total_pages += archived_result["pages_fetched"]
+            complete = complete and archived_result["complete"]
+        elif budget is not None and budget["remaining"] <= 0:
+            complete = False
 
     if name_prefix:
         all_tasks = [
@@ -989,7 +1071,9 @@ def cmd_tasks_search(client, args):
     if tag_filter:
         all_tasks = _filter_by_tags(all_tasks, tag_filter)
 
-    return _format_and_wrap(all_tasks, args)
+    result = _format_and_wrap(all_tasks, args)
+    result.update(_budget_metadata(total_pages, complete))
+    return result
 
 
 def cmd_tasks_delete(client, args):

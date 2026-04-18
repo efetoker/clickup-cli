@@ -88,19 +88,34 @@ def resolve_space_id(space_arg, spaces=None):
     return space_arg
 
 
-def fetch_all_comments(client, task_id):
-    """Fetch all comments for a task, paginating through all pages."""
-    all_comments = []
-    params = None
-    while True:
-        resp = client.get_v2(f"/task/{task_id}/comment", params=params)
-        comments = resp.get("comments", [])
-        if not comments:
-            break
-        all_comments.extend(comments)
-        last = comments[-1]
+def fetch_all_comments(client, task_id, all_pages=False):
+    """Fetch task comments with a bounded default and explicit exhaustive mode."""
+    first_page = client.get_v2(f"/task/{task_id}/comment", params=None)
+    comments = first_page.get("comments", [])
+    if not comments:
+        return {"comments": [], "complete": True, "truncated": False}
+
+    last = comments[-1]
+    params = {"start": str(last["date"]), "start_id": last["id"]}
+    next_page = client.get_v2(f"/task/{task_id}/comment", params=params)
+    next_comments = next_page.get("comments", [])
+
+    if not all_pages:
+        return {
+            "comments": comments,
+            "complete": not bool(next_comments),
+            "truncated": bool(next_comments),
+        }
+
+    all_comments = list(comments)
+    while next_comments:
+        all_comments.extend(next_comments)
+        last = next_comments[-1]
         params = {"start": str(last["date"]), "start_id": last["id"]}
-    return all_comments
+        next_page = client.get_v2(f"/task/{task_id}/comment", params=params)
+        next_comments = next_page.get("comments", [])
+
+    return {"comments": all_comments, "complete": True, "truncated": False}
 
 
 # Default fields for compact task output

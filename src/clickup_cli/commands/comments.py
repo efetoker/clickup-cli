@@ -224,7 +224,7 @@ def cmd_comments_list(client, args):
         return {"comments": comments, "count": len(comments)}
 
     # Paginate through all comments
-    all_comments = fetch_all_comments(client, args.task_id)
+    all_comments = fetch_all_comments(client, args.task_id, all_pages=True)["comments"]
     return {"comments": all_comments, "count": len(all_comments)}
 
 

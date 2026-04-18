@@ -179,14 +179,18 @@ class FetchAllCommentsTests(unittest.TestCase):
             {"comments": []},
         ]
         result = fetch_all_comments(client, "task1")
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0]["id"], "c1")
+        self.assertEqual(len(result["comments"]), 2)
+        self.assertEqual(result["comments"][0]["id"], "c1")
+        self.assertTrue(result["complete"])
+        self.assertFalse(result["truncated"])
 
     def test_empty_comments(self):
         client = MagicMock()
         client.get_v2.return_value = {"comments": []}
         result = fetch_all_comments(client, "task1")
-        self.assertEqual(result, [])
+        self.assertEqual(result["comments"], [])
+        self.assertTrue(result["complete"])
+        self.assertFalse(result["truncated"])
 
     def test_multi_page_comments(self):
         page1 = {
@@ -205,9 +209,24 @@ class FetchAllCommentsTests(unittest.TestCase):
         client = MagicMock()
         client.get_v2.side_effect = [page1, page2, page3]
 
+        result = fetch_all_comments(client, "task1", all_pages=True)
+        self.assertEqual(len(result["comments"]), 3)
+        self.assertEqual([c["id"] for c in result["comments"]], ["c1", "c2", "c3"])
+        self.assertTrue(result["complete"])
+        self.assertFalse(result["truncated"])
+
+    def test_default_mode_truncates_after_first_page_when_more_comments_exist(self):
+        client = MagicMock()
+        client.get_v2.side_effect = [
+            {"comments": [{"id": "c1", "date": "1000"}]},
+            {"comments": [{"id": "c2", "date": "2000"}]},
+        ]
+
         result = fetch_all_comments(client, "task1")
-        self.assertEqual(len(result), 3)
-        self.assertEqual([c["id"] for c in result], ["c1", "c2", "c3"])
+
+        self.assertEqual([c["id"] for c in result["comments"]], ["c1"])
+        self.assertFalse(result["complete"])
+        self.assertTrue(result["truncated"])
 
     def test_pagination_uses_last_comment_params(self):
         page1 = {"comments": [{"id": "c1", "date": "1000"}]}
@@ -216,7 +235,7 @@ class FetchAllCommentsTests(unittest.TestCase):
         client = MagicMock()
         client.get_v2.side_effect = [page1, page2]
 
-        fetch_all_comments(client, "task1")
+        fetch_all_comments(client, "task1", all_pages=True)
 
         # Second call should use start/start_id params
         second_call = client.get_v2.call_args_list[1]

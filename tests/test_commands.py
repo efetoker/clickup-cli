@@ -99,6 +99,8 @@ class FlexClient:
         # Match by path substring
         for key, resp in self._responses.items():
             if key in path:
+                if isinstance(resp, list):
+                    return resp.pop(0)
                 if callable(resp):
                     return resp(path, kwargs)
                 return resp
@@ -1144,28 +1146,58 @@ class TeamMembersTests(unittest.TestCase):
 
 class TasksGetTests(unittest.TestCase):
 
-    def test_get_with_comments(self):
+    def test_get_with_bounded_comments_by_default(self):
         client = MagicMock()
         client.dry_run = False
-        # First call: get task, second call: get comments (first page), third: empty page
         client.get_v2.side_effect = [
             {"id": "t1", "name": "Task"},  # GET /task/t1
             {"comments": [
                 {"id": "c1", "comment_text": "Hello", "user": {"username": "testuser"}, "date": "1000"}
             ]},  # GET /task/t1/comment (first call)
-            {"comments": []},  # GET /task/t1/comment (pagination check)
+            {"comments": [
+                {"id": "c2", "comment_text": "Later", "user": {"username": "other"}, "date": "2000"}
+            ]},  # bounded completeness probe finds more
         ]
-        args = Namespace(task_id="t1", no_comments=False)
+        args = Namespace(task_id="t1", no_comments=False, all_comments=False)
         result = cmd_tasks_get(client, args)
+
         self.assertEqual(result["id"], "t1")
         self.assertEqual(result["comment_count"], 1)
+        self.assertEqual(result["comment_count_returned"], 1)
+        self.assertFalse(result["comments_complete"])
+        self.assertTrue(result["comments_truncated"])
         self.assertEqual(result["comments"][0]["user"], "testuser")
+
+    def test_get_with_all_comments_fetches_every_page(self):
+        client = MagicMock()
+        client.dry_run = False
+        client.get_v2.side_effect = [
+            {"id": "t1", "name": "Task"},
+            {"comments": [
+                {"id": "c1", "comment_text": "Hello", "user": {"username": "testuser"}, "date": "1000"}
+            ]},
+            {"comments": [
+                {"id": "c2", "comment_text": "Later", "user": {"username": "other"}, "date": "2000"}
+            ]},
+            {"comments": []},
+        ]
+
+        result = cmd_tasks_get(
+            client,
+            Namespace(task_id="t1", no_comments=False, all_comments=True),
+        )
+
+        self.assertEqual(result["comment_count"], 2)
+        self.assertEqual(result["comment_count_returned"], 2)
+        self.assertTrue(result["comments_complete"])
+        self.assertFalse(result["comments_truncated"])
+        self.assertEqual([comment["id"] for comment in result["comments"]], ["c1", "c2"])
 
     def test_get_no_comments_flag(self):
         client = MagicMock()
         client.dry_run = False
         client.get_v2.return_value = {"id": "t1", "name": "Task"}
-        args = Namespace(task_id="t1", no_comments=True)
+        args = Namespace(task_id="t1", no_comments=True, all_comments=False)
         result = cmd_tasks_get(client, args)
         self.assertEqual(result["id"], "t1")
         self.assertNotIn("comments", result)
@@ -1181,9 +1213,12 @@ class TasksGetTests(unittest.TestCase):
             {"id": "t1", "name": "Task"},  # task fetch
             req.RequestException("timeout"),  # comment fetch fails
         ]
-        args = Namespace(task_id="t1", no_comments=False)
+        args = Namespace(task_id="t1", no_comments=False, all_comments=False)
         result = cmd_tasks_get(client, args)
         self.assertEqual(result["comment_count"], 0)
+        self.assertEqual(result["comment_count_returned"], 0)
+        self.assertFalse(result["comments_complete"])
+        self.assertFalse(result["comments_truncated"])
         self.assertEqual(result["comments"], [])
 
 
@@ -1869,7 +1904,7 @@ class TasksIncludeArchivedTests(unittest.TestCase):
         defaults = dict(
             space="testspace", list_id=None, include_closed=False,
             include_archived=False, status=None, subtasks=False,
-            tags=None, fields=None, full=False,
+            tags=None, fields=None, full=False, all_pages=False,
         )
         defaults.update(overrides)
         return Namespace(**defaults)
@@ -1878,20 +1913,56 @@ class TasksIncludeArchivedTests(unittest.TestCase):
         client = FlexClient(responses={
             "/list/": {"tasks": [], "last_page": True},
         })
-        cmd_tasks_list(client, self._list_args())
+        result = cmd_tasks_list(client, self._list_args())
         get_calls = [c for c in client.calls if c["method"] == "GET"]
         self.assertEqual(len(get_calls), 1)
         self.assertEqual(get_calls[0]["params"]["archived"], "false")
+        self.assertTrue(result["results_complete"])
+        self.assertFalse(result["results_truncated"])
 
     def test_list_two_calls_when_flag_set(self):
         client = FlexClient(responses={
             "/list/": {"tasks": [], "last_page": True},
         })
-        cmd_tasks_list(client, self._list_args(include_archived=True))
+        result = cmd_tasks_list(client, self._list_args(include_archived=True))
         get_calls = [c for c in client.calls if c["method"] == "GET"]
         self.assertEqual(len(get_calls), 2)
         seen_archived_values = {c["params"]["archived"] for c in get_calls}
         self.assertEqual(seen_archived_values, {"false", "true"})
+        self.assertTrue(result["results_complete"])
+        self.assertFalse(result["results_truncated"])
+
+    def test_list_default_budget_truncates_before_third_page(self):
+        client = FlexClient(responses={
+            "/list/": [
+                {"tasks": [{"id": "t1", "name": "A", "status": {"status": "open"}, "priority": None, "url": "u1"}], "last_page": False},
+                {"tasks": [{"id": "t2", "name": "B", "status": {"status": "open"}, "priority": None, "url": "u2"}], "last_page": False},
+                {"tasks": [{"id": "t3", "name": "C", "status": {"status": "open"}, "priority": None, "url": "u3"}], "last_page": True},
+            ]
+        })
+
+        result = cmd_tasks_list(client, self._list_args())
+
+        self.assertEqual([task["id"] for task in result["tasks"]], ["t1", "t2"])
+        self.assertEqual(result["pages_fetched"], 2)
+        self.assertFalse(result["results_complete"])
+        self.assertTrue(result["results_truncated"])
+
+    def test_list_all_pages_fetches_full_result(self):
+        client = FlexClient(responses={
+            "/list/": [
+                {"tasks": [{"id": "t1", "name": "A", "status": {"status": "open"}, "priority": None, "url": "u1"}], "last_page": False},
+                {"tasks": [{"id": "t2", "name": "B", "status": {"status": "open"}, "priority": None, "url": "u2"}], "last_page": False},
+                {"tasks": [{"id": "t3", "name": "C", "status": {"status": "open"}, "priority": None, "url": "u3"}], "last_page": True},
+            ]
+        })
+
+        result = cmd_tasks_list(client, self._list_args(all_pages=True))
+
+        self.assertEqual([task["id"] for task in result["tasks"]], ["t1", "t2", "t3"])
+        self.assertEqual(result["pages_fetched"], 3)
+        self.assertTrue(result["results_complete"])
+        self.assertFalse(result["results_truncated"])
 
     def test_list_merges_both_result_sets(self):
         def _resp(path, kwargs):
@@ -1917,13 +1988,35 @@ class TasksIncludeArchivedTests(unittest.TestCase):
         })
         args = Namespace(query="bug", include_closed=False,
                          include_archived=True, space=None, list_id=None,
-                         folder_id=None, name_prefix=None, tags=None,
-                         fields=None, full=False)
-        cmd_tasks_search(client, args)
+                          folder_id=None, name_prefix=None, tags=None,
+                         fields=None, full=False, all_pages=False)
+        result = cmd_tasks_search(client, args)
         get_calls = [c for c in client.calls if c["method"] == "GET"]
         self.assertEqual(len(get_calls), 2)
         archived_flags = [c["params"].get("archived") for c in get_calls]
         self.assertIn("true", archived_flags)
+        self.assertTrue(result["results_complete"])
+        self.assertFalse(result["results_truncated"])
+
+    def test_search_shared_budget_limits_archived_pass(self):
+        client = FlexClient(responses={
+            "/task": [
+                {"tasks": [{"id": "a1", "name": "Active 1", "status": {"status": "open"}, "priority": None, "url": "u1"}], "last_page": False},
+                {"tasks": [{"id": "a2", "name": "Active 2", "status": {"status": "open"}, "priority": None, "url": "u2"}], "last_page": False},
+                {"tasks": [{"id": "z1", "name": "Archived 1", "status": {"status": "open"}, "priority": None, "url": "u3"}], "last_page": False},
+            ]
+        })
+        args = Namespace(query="bug", include_closed=False,
+                         include_archived=True, space=None, list_id=None,
+                         folder_id=None, name_prefix=None, tags=None,
+                         fields=None, full=False, all_pages=False)
+
+        result = cmd_tasks_search(client, args)
+
+        self.assertEqual([task["id"] for task in result["tasks"]], ["a1", "a2"])
+        self.assertEqual(result["pages_fetched"], 2)
+        self.assertFalse(result["results_complete"])
+        self.assertTrue(result["results_truncated"])
 
     def test_search_space_scope_include_archived_uses_archived_lists_and_folders(self):
         def _space_lists(path, kwargs):

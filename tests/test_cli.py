@@ -671,6 +671,10 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.group, "tasks")
         self.assertEqual(args.command, "list")
 
+    def test_tasks_list_all_pages(self):
+        args = self._parse(["tasks", "list", "--space", "staging", "--all-pages"])
+        self.assertTrue(args.all_pages)
+
     def test_tasks_get(self):
         args = self._parse(["tasks", "get", "abc123"])
         self.assertEqual(args.command, "get")
@@ -679,6 +683,15 @@ class ParserComprehensiveTests(unittest.TestCase):
     def test_tasks_get_no_comments(self):
         args = self._parse(["tasks", "get", "abc123", "--no-comments"])
         self.assertTrue(args.no_comments)
+
+    def test_tasks_get_all_comments(self):
+        args = self._parse(["tasks", "get", "abc123", "--all-comments"])
+        self.assertTrue(args.all_comments)
+
+    def test_tasks_get_rejects_conflicting_comment_flags(self):
+        with self.assertRaises(SystemExit) as ctx:
+            self._parse(["tasks", "get", "abc123", "--no-comments", "--all-comments"])
+        self.assertEqual(ctx.exception.code, 2)
 
     def test_tasks_create(self):
         args = self._parse(["tasks", "create", "--space", "staging", "--name", "Bug"])
@@ -698,6 +711,10 @@ class ParserComprehensiveTests(unittest.TestCase):
         args = self._parse(["tasks", "move", "abc123", "--to", "dev"])
         self.assertEqual(args.command, "move")
         self.assertEqual(args.to_list, "dev")
+
+    def test_tasks_search_all_pages(self):
+        args = self._parse(["tasks", "search", "bug", "--all-pages"])
+        self.assertTrue(args.all_pages)
 
     def test_tasks_merge(self):
         args = self._parse(["tasks", "merge", "abc123", "--sources", "d,e"])
