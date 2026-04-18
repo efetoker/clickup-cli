@@ -26,6 +26,7 @@ from clickup_cli.commands.docs import (
     cmd_docs_list,
     cmd_docs_pages,
     cmd_docs_edit_page,
+    register_parser as register_docs_parser,
 )
 from clickup_cli.commands.folders import (
     cmd_folders_create,
@@ -324,6 +325,16 @@ class DocsListTests(unittest.TestCase):
         params = client.calls[0]["params"]
         self.assertIn("parent_id", params)
 
+    def test_list_with_raw_space_id_filter(self):
+        client = FlexClient(responses={"/docs": {"docs": [{"id": "d1"}]}})
+        args = Namespace(space="111")
+        result = cmd_docs_list(client, args)
+
+        self.assertEqual(result["count"], 1)
+        params = client.calls[0]["params"]
+        self.assertEqual(params["parent_id"], "111")
+        self.assertEqual(params["parent_type"], "SPACE")
+
     def test_list_pagination(self):
         call_count = [0]
         def mock_docs(path, kwargs):
@@ -363,6 +374,15 @@ class DocsCreateTests(unittest.TestCase):
         result = cmd_docs_create(client, args)
         self.assertTrue(result["dry_run"])
         self.assertEqual(result["body"]["name"], "Doc")
+
+    def test_dry_run_accepts_raw_space_id(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(space="111", name="Doc", content=None,
+                         content_file=None, visibility=None)
+        result = cmd_docs_create(client, args)
+
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["body"]["parent"], {"id": "111", "type": 4})
 
     def test_create_without_content(self):
         client = FlexClient(responses={"/docs": {"id": "d1"}})
