@@ -1,7 +1,7 @@
 """Doc command handlers — list, get, create, pages, get-page, edit-page, create-page."""
 
-from ..config import WORKSPACE_ID, SPACES
-from ..helpers import read_content, error, add_id_argument
+from ..config import WORKSPACE_ID
+from ..helpers import read_content, error, add_id_argument, resolve_space_id
 
 
 def register_parser(subparsers, F):
@@ -309,10 +309,8 @@ def cmd_docs_list(client, args):
 
     params = {"limit": "100"}
     if args.space:
-        space = SPACES.get(args.space)
-        if space:
-            params["parent_id"] = space["space_id"]
-            params["parent_type"] = "SPACE"
+        params["parent_id"] = resolve_space_id(args.space)
+        params["parent_type"] = "SPACE"
 
     all_docs = []
     cursor = None
@@ -336,12 +334,10 @@ def cmd_docs_get(client, args):
 def cmd_docs_create(client, args):
     """Create a new doc in a space."""
     content = read_content(args.content, args.content_file, "--content")
-    space = SPACES.get(args.space)
-    if not space:
-        error(f"Unknown space: {args.space}. Check your config file.")
+    space_id = resolve_space_id(args.space)
 
     body = {"name": args.name}
-    body["parent"] = {"id": space["space_id"], "type": 4}
+    body["parent"] = {"id": space_id, "type": 4}
     if args.visibility:
         body["visibility"] = args.visibility
 
