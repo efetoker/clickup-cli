@@ -56,10 +56,14 @@ returns:
 examples:
   clickup docs list
   clickup docs list --space <name>
+  clickup docs list --space 12345
   clickup --pretty docs list""",
     )
     dl.add_argument(
-        "--space", type=str, help="Filter docs to a specific space"
+        "--space",
+        metavar="SPACE_NAME_OR_ID",
+        type=str,
+        help="Filter docs to a specific space name or raw ID",
     )
 
     # docs get
@@ -96,7 +100,8 @@ automatically — no need for a separate edit-page call.
 
 Use --dry-run to preview the request body without creating the doc.
 Global flags may appear before or after the command group:
-  clickup --dry-run docs create --space <name> --name "My doc" """,
+  clickup --dry-run docs create --space <name> --name "My doc"
+  clickup --dry-run docs create --space 12345 --name "My doc""",
         epilog="""\
 returns:
   The created doc object from the API. If content was written, includes
@@ -104,6 +109,7 @@ returns:
 
 examples:
   clickup docs create --space <name> --name "Sprint notes"
+  clickup docs create --space 12345 --name "Sprint notes"
   clickup docs create --space <name> --name "API spec" --content-file spec.md
   clickup docs create --space <name> --name "Journal" --content "# Entry"
   clickup --dry-run docs create --space <name> --name "Test doc"
@@ -115,8 +121,9 @@ notes:
     dc.add_argument(
         "--space",
         required=True,
+        metavar="SPACE_NAME_OR_ID",
         type=str,
-        help="Space to create the doc in (required)",
+        help="Space name or raw ID to create the doc in (required)",
     )
     dc.add_argument("--name", required=True, help="Document name (required)")
     dc.add_argument(
