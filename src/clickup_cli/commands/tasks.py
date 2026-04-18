@@ -933,12 +933,12 @@ def cmd_tasks_search(client, args):
     params = {"search": args.query}
     if args.include_closed:
         params["include_closed"] = "true"
-    if args.space:
-        params["list_ids[]"] = _resolve_scope_list_ids(client, args.space)
     if hasattr(args, "list_id") and args.list_id:
         params["list_ids[]"] = args.list_id
-    if hasattr(args, "folder_id") and args.folder_id:
+    elif hasattr(args, "folder_id") and args.folder_id:
         params["project_ids[]"] = args.folder_id
+    elif args.space:
+        params["list_ids[]"] = _resolve_scope_list_ids(client, args.space)
 
     all_tasks = _paginate_tasks(client, f"/team/{WORKSPACE_ID}/task", params)
 

@@ -1450,6 +1450,24 @@ class TasksSearchBehaviorTests(unittest.TestCase):
             cmd_tasks_search(client, args)
         self.assertFalse(any(call["path"].endswith("/task") for call in client.calls))
 
+    def test_bad_space_alias_does_not_override_explicit_list_scope(self):
+        client = FlexClient(responses={"/task": {"tasks": [], "last_page": True}})
+        args = self._make_search_args(space="badname", list_id="custom_list")
+
+        cmd_tasks_search(client, args)
+
+        self.assertEqual(len(client.calls), 1)
+        self.assertEqual(client.calls[0]["params"]["list_ids[]"], "custom_list")
+
+    def test_bad_space_alias_does_not_override_explicit_folder_scope(self):
+        client = FlexClient(responses={"/task": {"tasks": [], "last_page": True}})
+        args = self._make_search_args(space="badname", folder_id="f123")
+
+        cmd_tasks_search(client, args)
+
+        self.assertEqual(len(client.calls), 1)
+        self.assertEqual(client.calls[0]["params"]["project_ids[]"], "f123")
+
     def test_search_help_describes_space_scope_as_whole_space(self):
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="group")
