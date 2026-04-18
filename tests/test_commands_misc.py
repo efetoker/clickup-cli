@@ -271,7 +271,8 @@ class InitTokenFlagTests(unittest.TestCase):
         args = Namespace(token="pk_test_123")
         with patch("builtins.open", unittest.mock.mock_open()):
             with patch("os.makedirs"):
-                cmd_init(args)
+                with patch("clickup_cli.commands.init.os.chmod"):
+                    cmd_init(args)
 
         # Should NOT have called input() — token was provided via flag
         self.assertEqual(mock_get.call_count, 2)
@@ -398,7 +399,8 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
         args = Namespace(token="pk_test")
         with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
             with patch("os.makedirs"):
-                cmd_init(args)
+                with patch("clickup_cli.commands.init.os.chmod"):
+                    cmd_init(args)
 
         # Verify config was written with correct workspace_id
         written = mock_file().write.call_args_list
@@ -420,7 +422,8 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
         with patch("builtins.input", return_value="2"):
             with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
                 with patch("os.makedirs"):
-                    cmd_init(args)
+                    with patch("clickup_cli.commands.init.os.chmod"):
+                        cmd_init(args)
 
         written = mock_file().write.call_args_list
         written_text = "".join(call[0][0] for call in written)
@@ -441,7 +444,8 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
         with patch("builtins.input", return_value=""):
             with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
                 with patch("os.makedirs"):
-                    cmd_init(args)
+                    with patch("clickup_cli.commands.init.os.chmod"):
+                        cmd_init(args)
 
         written = mock_file().write.call_args_list
         written_text = "".join(call[0][0] for call in written)
@@ -464,7 +468,8 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
         args = Namespace(token="pk_test")
         with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
             with patch("os.makedirs"):
-                cmd_init(args)
+                with patch("clickup_cli.commands.init.os.chmod"):
+                    cmd_init(args)
 
         written = mock_file().write.call_args_list
         written_text = "".join(call[0][0] for call in written)
