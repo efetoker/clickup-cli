@@ -173,14 +173,6 @@ def load_config():
         "  export CLICKUP_API_TOKEN=pk_YOUR_TOKEN\n"
         "  export CLICKUP_WORKSPACE_ID=YOUR_WORKSPACE_ID"
     )
-
-
-def _reset():
-    """Reset cached config (for testing)."""
-    global _config_cache
-    _config_cache = None
-
-
 # Lazy attribute access — config is loaded on first use, not at import time.
 # This allows `clickup init` to run before any config file exists.
 _ATTR_MAP = {
