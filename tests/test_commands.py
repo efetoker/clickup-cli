@@ -348,6 +348,25 @@ class DocsListTests(unittest.TestCase):
         result = cmd_docs_list(client, args)
         self.assertEqual(result["count"], 2)
 
+    def test_invalid_space_name_fails_before_request(self):
+        client = FlexClient(responses={"/docs": {"docs": [{"id": "d1"}]}})
+        args = Namespace(space="badname")
+
+        with self.assertRaises(SystemExit):
+            cmd_docs_list(client, args)
+
+        self.assertEqual(client.calls, [])
+
+    def test_list_help_mentions_space_name_or_id(self):
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="group")
+        register_docs_parser(subparsers, argparse.RawDescriptionHelpFormatter)
+        docs_parser = subparsers.choices["docs"]
+        list_parser = docs_parser._subparsers._group_actions[0].choices["list"]
+        help_text = list_parser.format_help()
+
+        self.assertIn("SPACE_NAME_OR_ID", help_text)
+
 
 class DocsGetTests(unittest.TestCase):
 
@@ -397,6 +416,16 @@ class DocsCreateTests(unittest.TestCase):
                          content_file=None, visibility="PRIVATE")
         result = cmd_docs_create(client, args)
         self.assertEqual(result["body"]["visibility"], "PRIVATE")
+
+    def test_create_help_mentions_space_name_or_id(self):
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="group")
+        register_docs_parser(subparsers, argparse.RawDescriptionHelpFormatter)
+        docs_parser = subparsers.choices["docs"]
+        create_parser = docs_parser._subparsers._group_actions[0].choices["create"]
+        help_text = create_parser.format_help()
+
+        self.assertIn("SPACE_NAME_OR_ID", help_text)
 
 
 class DocsPagesTests(unittest.TestCase):
