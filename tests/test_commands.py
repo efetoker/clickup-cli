@@ -2,6 +2,7 @@
 
 import contextlib
 import io
+import tempfile
 import unittest
 from argparse import Namespace
 from unittest.mock import MagicMock, patch
@@ -215,6 +216,29 @@ class CommentsUpdateTests(unittest.TestCase):
         self.assertTrue(result["dry_run"])
         self.assertEqual(result["body"]["comment_text"], "New")
 
+    def test_update_empty_text_clear_inline(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(comment_id="c1", text="", file=None, resolved=None)
+        result = cmd_comments_update(client, args)
+        self.assertTrue(result["dry_run"])
+        self.assertIn("comment_text", result["body"])
+        self.assertEqual(result["body"]["comment_text"], "")
+
+    def test_update_empty_text_clear_from_file(self):
+        client = FlexClient(dry_run=True)
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            args = Namespace(
+                comment_id="c1",
+                text=None,
+                file=handle.name,
+                resolved=None,
+            )
+            result = cmd_comments_update(client, args)
+
+        self.assertTrue(result["dry_run"])
+        self.assertIn("comment_text", result["body"])
+        self.assertEqual(result["body"]["comment_text"], "")
+
 
 class CommentsDeleteTests(unittest.TestCase):
 
@@ -418,6 +442,26 @@ class DocsEditPageTests(unittest.TestCase):
         result = cmd_docs_edit_page(client, args)
         self.assertTrue(result["dry_run"])
         self.assertEqual(result["body"]["content"], "Hi")
+
+    def test_replace_empty_content_clear_inline(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(doc_id="d1", page_id="p1", content="",
+                         content_file=None, name=None, append=False)
+        result = cmd_docs_edit_page(client, args)
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["body"]["content"], "")
+        self.assertEqual(result["body"]["content_format"], "text/md")
+
+    def test_replace_empty_content_clear_from_file(self):
+        client = FlexClient(dry_run=True)
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            args = Namespace(doc_id="d1", page_id="p1", content=None,
+                             content_file=handle.name, name=None, append=False)
+            result = cmd_docs_edit_page(client, args)
+
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["body"]["content"], "")
+        self.assertEqual(result["body"]["content_format"], "text/md")
 
 
 class DocsCreatePageTests(unittest.TestCase):
@@ -1160,6 +1204,22 @@ class TasksUpdateExpandedFieldsTests(unittest.TestCase):
         self.assertEqual(result["tag_removes"], ["draft"])
         self.assertEqual(result["custom_fields"], [{"field_id": "f1", "value": "hello"}])
         # Dry-run must not issue any API call
+        self.assertEqual(client.calls, [])
+
+    def test_update_empty_description_clear_inline(self):
+        client = FlexClient(dry_run=True)
+        result = cmd_tasks_update(client, self._args(desc=""))
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["put_body"]["markdown_description"], "")
+        self.assertEqual(client.calls, [])
+
+    def test_update_empty_description_clear_from_file(self):
+        client = FlexClient(dry_run=True)
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            result = cmd_tasks_update(client, self._args(desc_file=handle.name))
+
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["put_body"]["markdown_description"], "")
         self.assertEqual(client.calls, [])
 
 
