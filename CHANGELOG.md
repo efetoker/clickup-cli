@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.0 (2026-04-18)
+
+- **Space-scoped task search and docs filtering now match the requested scope.** `tasks search --space <alias-or-id>` expands to every list in the resolved space, preserves explicit `--list` / `--folder` overrides, handles archived-only and empty-space edge cases without widening scope, and keeps the existing dry-run envelope intact. `docs list` and `docs create` now resolve `--space` through the shared alias-or-raw-ID path and fail fast on bad non-numeric space names.
+- **Task payloads are bounded by default, with explicit exhaustive flags when you need everything.** `tasks get` now returns bounded comments by default with `--all-comments` as the exhaustive opt-in, while `tasks list` and `tasks search` share a default page budget and expose `--all-pages` as the explicit escape hatch. Each command adds machine-readable completeness metadata inside the existing JSON response envelope.
+- **Task create/update request shaping is stricter and more predictable.** Repeated `--tag` values on `tasks list` are preserved, update/edit flows now accept explicit empty-string clears for descriptions, doc page content, and comment text, and `tasks create` still omits empty descriptions instead of sending empty strings by accident.
+- **Config and runtime identity handling are cleaner.** `clickup init` now persists canonical `space_id` values without eager per-space list discovery, runtime workspace context flows through the client instead of ambient globals, and alias-based task flows lazily resolve default lists only when needed.
+- **The CLI contract is enforced more aggressively in automation and local config writes are hardened.** CI now runs the JSON stdout/stderr contract validator on Python 3.11, init/config rewrite paths enforce owner-only file permissions, and existing config directories are re-hardened on write.
+- **Internal command wiring is easier to maintain without changing how users invoke the CLI.** Privacy handlers now share one helper, command registration is manifest-driven, task internals are split behind a compatibility facade, and the large command-handler test module is split by command family.
+
 ## 1.5.0 (2026-04-12)
 
 - **New `privacy` subcommand on `spaces`, `folders`, and `lists`.** Toggle the privacy of a space, folder, or list via the v3 ACLs endpoint without leaving the terminal. Each subcommand takes a positional ID (or its `--<id>` flag form) plus a required mutually exclusive `--private` / `--public` flag. Hits `PATCH /v3/workspaces/{wid}/{space|folder|list}/{id}/acls` with a minimal `{"private": true|false}` body. Granular ACL entries (member or guest grants) are intentionally not exposed — use the ClickUp UI for that.

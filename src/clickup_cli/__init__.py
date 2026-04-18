@@ -1,3 +1,3 @@
 """ClickUp CLI — the missing ClickUp CLI for developers and AI agents."""
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"

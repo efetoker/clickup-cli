@@ -947,7 +947,7 @@ class EntrypointTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(result.returncode, 0)
-        self.assertIn("1.5.0", result.stdout)
+        self.assertIn("1.6.0", result.stdout)
 
 
 class ConfigFallbackTests(unittest.TestCase):
