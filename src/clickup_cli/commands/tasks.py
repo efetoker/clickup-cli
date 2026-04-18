@@ -964,6 +964,7 @@ def cmd_tasks_search(client, args):
     if getattr(args, "include_archived", False):
         archived_params = dict(params)
         archived_params["archived"] = "true"
+        run_archived_search = True
         if resolved_space_list_ids is not None:
             archived_list_ids = _resolve_scope_list_ids(
                 client,
@@ -971,12 +972,17 @@ def cmd_tasks_search(client, args):
                 include_archived=True,
                 allow_empty=True,
             )
-            archived_params["list_ids[]"] = list(
+            scoped_archived_list_ids = list(
                 dict.fromkeys(resolved_space_list_ids + archived_list_ids)
             )
-        all_tasks.extend(
-            _paginate_tasks(client, f"/team/{WORKSPACE_ID}/task", archived_params)
-        )
+            if scoped_archived_list_ids:
+                archived_params["list_ids[]"] = scoped_archived_list_ids
+            else:
+                run_archived_search = False
+        if run_archived_search:
+            all_tasks.extend(
+                _paginate_tasks(client, f"/team/{WORKSPACE_ID}/task", archived_params)
+            )
 
     if name_prefix:
         all_tasks = [

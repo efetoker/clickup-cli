@@ -1934,6 +1934,46 @@ class TasksIncludeArchivedTests(unittest.TestCase):
         self.assertEqual(len(task_calls), 1)
         self.assertEqual(task_calls[0]["params"].get("archived"), "true")
 
+    def test_search_space_scope_include_archived_skips_completely_empty_space(self):
+        client = FlexClient(
+            responses={
+                "/space/111/list": {"lists": []},
+                "/space/111/folder": {"folders": []},
+                "/task": {
+                    "tasks": [
+                        {
+                            "id": "should-not-run",
+                            "name": "task",
+                            "status": {"status": "open"},
+                            "priority": None,
+                            "url": "u",
+                        }
+                    ],
+                    "last_page": True,
+                },
+            }
+        )
+        args = Namespace(
+            query="bug",
+            include_closed=False,
+            include_archived=True,
+            space="111",
+            list_id=None,
+            folder_id=None,
+            name_prefix=None,
+            tags=None,
+            fields=None,
+            full=False,
+        )
+
+        result = cmd_tasks_search(client, args)
+
+        self.assertEqual(result["tasks"], [])
+        task_calls = [
+            call for call in client.calls if call["method"] == "GET" and call["path"].endswith("/task")
+        ]
+        self.assertEqual(task_calls, [])
+
 
 # ─── CLI dispatch ─────────────────────────────────────────────────────────
 
