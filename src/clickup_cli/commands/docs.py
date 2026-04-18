@@ -311,12 +311,17 @@ def _append_markdown(existing, new_content):
 
 
 def cmd_docs_list(client, args):
+    resolved_space_id = resolve_space_id(args.space) if args.space else None
+
     if client.dry_run:
-        return {"dry_run": True, "action": "list_docs", "space": getattr(args, "space", None)}
+        result = {"dry_run": True, "action": "list_docs", "space": getattr(args, "space", None)}
+        if resolved_space_id is not None:
+            result["resolved_space_id"] = resolved_space_id
+        return result
 
     params = {"limit": "100"}
-    if args.space:
-        params["parent_id"] = resolve_space_id(args.space)
+    if resolved_space_id is not None:
+        params["parent_id"] = resolved_space_id
         params["parent_type"] = "SPACE"
 
     all_docs = []

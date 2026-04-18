@@ -922,8 +922,15 @@ def cmd_tasks_update(client, args):
 
 
 def cmd_tasks_search(client, args):
+    resolved_space_list_ids = None
+    if args.space and not getattr(args, "list_id", None) and not getattr(args, "folder_id", None):
+        resolved_space_list_ids = _resolve_scope_list_ids(client, args.space)
+
     if client.dry_run:
-        return {"dry_run": True, "action": "search_tasks", "query": args.query}
+        result = {"dry_run": True, "action": "search_tasks", "query": args.query}
+        if resolved_space_list_ids is not None:
+            result["resolved_list_ids"] = resolved_space_list_ids
+        return result
 
     # Auto-apply --name-prefix when query looks like a task ID (e.g. PROJ-39)
     name_prefix = getattr(args, "name_prefix", None)
@@ -937,8 +944,8 @@ def cmd_tasks_search(client, args):
         params["list_ids[]"] = args.list_id
     elif hasattr(args, "folder_id") and args.folder_id:
         params["project_ids[]"] = args.folder_id
-    elif args.space:
-        params["list_ids[]"] = _resolve_scope_list_ids(client, args.space)
+    elif resolved_space_list_ids is not None:
+        params["list_ids[]"] = resolved_space_list_ids
 
     all_tasks = _paginate_tasks(client, f"/team/{WORKSPACE_ID}/task", params)
 

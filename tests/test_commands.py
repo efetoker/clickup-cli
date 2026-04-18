@@ -311,6 +311,15 @@ class DocsListTests(unittest.TestCase):
         result = cmd_docs_list(client, args)
         self.assertTrue(result["dry_run"])
 
+    def test_dry_run_with_invalid_space_name_fails_before_preview(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(space="badname")
+
+        with self.assertRaises(SystemExit):
+            cmd_docs_list(client, args)
+
+        self.assertEqual(client.calls, [])
+
     def test_list_without_space_filter(self):
         client = FlexClient(responses={"/docs": {"docs": [{"id": "d1"}]}})
         args = Namespace(space=None)
@@ -1467,6 +1476,15 @@ class TasksSearchBehaviorTests(unittest.TestCase):
 
         self.assertEqual(len(client.calls), 1)
         self.assertEqual(client.calls[0]["params"]["project_ids[]"], "f123")
+
+    def test_dry_run_with_active_bad_space_alias_still_fails_validation(self):
+        client = FlexClient(dry_run=True)
+        args = self._make_search_args(space="badname")
+
+        with self.assertRaises(SystemExit):
+            cmd_tasks_search(client, args)
+
+        self.assertEqual(client.calls, [])
 
     def test_search_help_describes_space_scope_as_whole_space(self):
         parser = argparse.ArgumentParser()
