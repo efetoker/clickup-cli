@@ -1,5 +1,6 @@
 """Tests for all command handlers — behavioral coverage for every command module."""
 
+import argparse
 import contextlib
 import io
 import tempfile
@@ -66,6 +67,7 @@ from clickup_cli.commands.tasks import (
     cmd_tasks_update,
     cmd_tasks_search,
     cmd_tasks_depend,
+    register_parser as register_tasks_parser,
 )
 from clickup_cli.commands.init import cmd_init
 
@@ -1312,6 +1314,33 @@ class TasksCreateBehaviorTests(unittest.TestCase):
 
 class TasksSearchBehaviorTests(unittest.TestCase):
 
+    def _make_search_args(self, **overrides):
+        defaults = dict(
+            query="bug",
+            include_closed=False,
+            include_archived=False,
+            space=None,
+            list_id=None,
+            folder_id=None,
+            name_prefix=None,
+            tags=None,
+            fields=None,
+            full=False,
+        )
+        defaults.update(overrides)
+        return Namespace(**defaults)
+
+    def _search_client_for_full_space_scope(self):
+        return FlexClient(
+            responses={
+                "/space/111/list": {"lists": [{"id": "folderless-1"}, {"id": "shared"}]},
+                "/space/111/folder": {"folders": [{"id": "f1"}, {"id": "f2"}]},
+                "/folder/f1/list": {"lists": [{"id": "folder-list-1"}, {"id": "shared"}]},
+                "/folder/f2/list": {"lists": [{"id": "folder-list-2"}]},
+                "/task": {"tasks": [], "last_page": True},
+            }
+        )
+
     def test_auto_name_prefix_for_task_id_pattern(self):
         """Query matching ABC-123 pattern auto-applies --name-prefix."""
         client = FlexClient(responses={
@@ -1323,9 +1352,7 @@ class TasksSearchBehaviorTests(unittest.TestCase):
                 "last_page": True,
             }
         })
-        args = Namespace(query="PROJ-39", include_closed=False, space=None,
-                         list_id=None, folder_id=None, name_prefix=None,
-                         fields=None, full=False)
+        args = self._make_search_args(query="PROJ-39")
         buf = io.StringIO()
         with contextlib.redirect_stderr(buf):
             result = cmd_tasks_search(client, args)
@@ -1335,24 +1362,52 @@ class TasksSearchBehaviorTests(unittest.TestCase):
         # Auto-prefix must be silent (no informational hint on stderr)
         self.assertEqual(buf.getvalue(), "")
 
-    def test_space_scoping(self):
-        client = FlexClient(responses={
-            "/task": {"tasks": [], "last_page": True}
-        })
-        args = Namespace(query="bug", include_closed=False, space="testspace",
-                         list_id=None, folder_id=None, name_prefix=None,
-                         fields=None, full=False)
+    def test_space_scoping_expands_alias_to_all_lists_in_space(self):
+        client = self._search_client_for_full_space_scope()
+        args = self._make_search_args(space="testspace")
         cmd_tasks_search(client, args)
-        params = client.calls[0]["params"]
-        self.assertEqual(params["list_ids[]"], "222")  # testspace list_id
+        search_call = next(call for call in client.calls if call["path"].endswith("/task"))
+        self.assertEqual(
+            search_call["params"]["list_ids[]"],
+            ["folderless-1", "shared", "folder-list-1", "folder-list-2"],
+        )
+
+    def test_space_scoping_expands_raw_space_id_to_all_lists_in_space(self):
+        client = self._search_client_for_full_space_scope()
+        args = self._make_search_args(space="111")
+        cmd_tasks_search(client, args)
+        search_call = next(call for call in client.calls if call["path"].endswith("/task"))
+        self.assertEqual(
+            search_call["params"]["list_ids[]"],
+            ["folderless-1", "shared", "folder-list-1", "folder-list-2"],
+        )
+
+    def test_space_scoping_errors_when_space_has_no_lists(self):
+        client = FlexClient(
+            responses={
+                "/space/111/list": {"lists": []},
+                "/space/111/folder": {"folders": []},
+            }
+        )
+        args = self._make_search_args(space="111")
+        with self.assertRaises(SystemExit):
+            cmd_tasks_search(client, args)
+        self.assertFalse(any(call["path"].endswith("/task") for call in client.calls))
+
+    def test_search_help_describes_space_scope_as_whole_space(self):
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="group")
+        register_tasks_parser(subparsers, argparse.RawDescriptionHelpFormatter)
+        tasks_parser = subparsers.choices["tasks"]
+        search_parser = tasks_parser._subparsers._group_actions[0].choices["search"]
+        help_text = search_parser.format_help()
+        self.assertIn("search the whole space", help_text)
 
     def test_list_scoping(self):
         client = FlexClient(responses={
             "/task": {"tasks": [], "last_page": True}
         })
-        args = Namespace(query="bug", include_closed=False, space=None,
-                         list_id="custom_list", folder_id=None, name_prefix=None,
-                         fields=None, full=False)
+        args = self._make_search_args(list_id="custom_list")
         cmd_tasks_search(client, args)
         params = client.calls[0]["params"]
         self.assertEqual(params["list_ids[]"], "custom_list")
@@ -1361,9 +1416,7 @@ class TasksSearchBehaviorTests(unittest.TestCase):
         client = FlexClient(responses={
             "/task": {"tasks": [], "last_page": True}
         })
-        args = Namespace(query="bug", include_closed=False, space=None,
-                         list_id=None, folder_id="f123", name_prefix=None,
-                         fields=None, full=False)
+        args = self._make_search_args(folder_id="f123")
         cmd_tasks_search(client, args)
         params = client.calls[0]["params"]
         self.assertEqual(params["project_ids[]"], "f123")

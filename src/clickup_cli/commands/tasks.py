@@ -359,8 +359,9 @@ Results are paginated internally and returned as a single JSON object.
 By default, output is compact (id, name, status, priority, url).
 Use --full for the raw API response, or --fields to pick specific fields.
 
-Use --space, --list, or --folder to scope results. Without any scope
-filter, results may include tasks from all spaces.
+Use --space, --list, or --folder to scope results. Use `--space` to search the
+whole space across every list it owns. Without any scope filter, results may
+include tasks from all spaces.
 
 When the query looks like a task ID (e.g. PROJ-39, PROJ-12), --name-prefix
 is auto-applied to filter exact matches. Use --name-prefix explicitly for
@@ -383,6 +384,7 @@ notes:
   Use --full for raw API response, or --fields for custom field selection.
   Queries matching the pattern ABC-123 auto-apply --name-prefix.
   Use --space, --list, or --folder to scope results.
+  Use `--space` to search the whole space across every list it owns.
   --name-prefix filters the returned tasks client-side by task name prefix.
   The search API has a default page size — this CLI handles pagination
   automatically and returns all matching results.""",
@@ -403,7 +405,7 @@ notes:
         "--space",
         metavar="SPACE_NAME_OR_ID",
         type=str,
-        help="Scope search to a specific space (name from config or raw ID)",
+        help="Scope search to a specific space (name from config or raw ID); use it to search the whole space",
     )
     ts.add_argument(
         "--list", type=str, dest="list_id", help="Scope search to a specific list ID"
@@ -677,16 +679,42 @@ def _first_folderless_list_id(client, space_id):
     return lists[0]["id"]
 
 
-def _resolve_scope_list_id(client, space_arg):
-    """Resolve --space (alias or raw ID) to a list_id for search scoping."""
+def _resolve_space_id(space_arg):
+    """Resolve a --space alias or raw ID to a concrete space ID."""
     if not space_arg:
         return None
     space = SPACES.get(space_arg)
     if space:
-        return space["list_id"]
+        return space["space_id"]
     if space_arg.isdigit():
-        return _first_folderless_list_id(client, space_arg)
+        return space_arg
     error(f"Unknown space: {space_arg}. Check your config file.")
+
+
+def _resolve_scope_list_ids(client, space_arg):
+    """Resolve --space to every list ID in that space for search scoping."""
+    space_id = _resolve_space_id(space_arg)
+
+    folderless_resp = client.get_v2(f"/space/{space_id}/list", allow_dry_run=True)
+    folderless_lists = folderless_resp.get("lists", [])
+
+    folder_resp = client.get_v2(f"/space/{space_id}/folder", allow_dry_run=True)
+    folders = folder_resp.get("folders", [])
+
+    list_ids = [item["id"] for item in folderless_lists]
+    for folder in folders:
+        folder_lists_resp = client.get_v2(
+            f"/folder/{folder['id']}/list", allow_dry_run=True
+        )
+        list_ids.extend(item["id"] for item in folder_lists_resp.get("lists", []))
+
+    list_ids = list(dict.fromkeys(list_ids))
+    if not list_ids:
+        error(
+            f"Space {space_arg} has no lists available for search scoping. "
+            "Pass --list <list_id> or --folder <folder_id> instead."
+        )
+    return list_ids
 
 
 def _paginate_tasks(client, path, params):
@@ -906,9 +934,7 @@ def cmd_tasks_search(client, args):
     if args.include_closed:
         params["include_closed"] = "true"
     if args.space:
-        scope_list_id = _resolve_scope_list_id(client, args.space)
-        if scope_list_id:
-            params["list_ids[]"] = scope_list_id
+        params["list_ids[]"] = _resolve_scope_list_ids(client, args.space)
     if hasattr(args, "list_id") and args.list_id:
         params["list_ids[]"] = args.list_id
     if hasattr(args, "folder_id") and args.folder_id:
