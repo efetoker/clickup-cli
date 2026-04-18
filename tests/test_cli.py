@@ -14,6 +14,7 @@ from clickup_cli.commands.folders import cmd_folders_create
 from clickup_cli.commands.tasks import (
     cmd_tasks_create,
     cmd_tasks_delete,
+    cmd_tasks_list,
     cmd_tasks_search,
     cmd_tasks_update,
 )
@@ -752,8 +753,68 @@ class FilterTaskFieldsTests(unittest.TestCase):
 class TasksListPaginationTests(unittest.TestCase):
     """Tests for cmd_tasks_list pagination — safety net for pagination refactor."""
 
+    def test_tasks_list_repeated_tags_preserve_all_values_in_outgoing_params(self):
+        client = FakeClient(
+            task_pages=[
+                {
+                    "tasks": [
+                        {
+                            "id": "t1",
+                            "name": "Tagged task",
+                            "status": {"status": "open"},
+                            "priority": None,
+                            "url": "u1",
+                        },
+                    ],
+                    "last_page": True,
+                }
+            ]
+        )
+        args = Namespace(
+            space="staging",
+            list_id=None,
+            include_closed=False,
+            include_archived=False,
+            status=None,
+            subtasks=False,
+            tags=["Urgent", "In Review"],
+            fields=None,
+            full=False,
+        )
+
+        result = cmd_tasks_list(client, args)
+
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["tasks"][0]["id"], "t1")
+        self.assertEqual(len(client.v2_calls), 1)
+        self.assertEqual(
+            client.v2_calls[0][1]["tags[]"],
+            ["urgent", "in review"],
+        )
+
+    def test_tasks_list_repeated_tags_use_list_param_shape(self):
+        client = FakeClient(task_pages=[{"tasks": [], "last_page": True}])
+        args = Namespace(
+            space="staging",
+            list_id=None,
+            include_closed=False,
+            include_archived=False,
+            status=None,
+            subtasks=False,
+            tags=["Urgent", "In Review"],
+            fields=None,
+            full=False,
+        )
+
+        cmd_tasks_list(client, args)
+
+        self.assertIsInstance(client.v2_calls[0][1]["tags[]"], list)
+        self.assertEqual(
+            client.v2_calls[0][1]["tags[]"],
+            ["urgent", "in review"],
+        )
+
     def test_single_page(self):
-        from clickup_cli.commands.tasks import cmd_tasks_list
         client = FakeClient(
             task_pages=[
                 {
@@ -765,15 +826,14 @@ class TasksListPaginationTests(unittest.TestCase):
             ]
         )
         args = Namespace(
-            space="staging", list_id=None, include_closed=False, status=None,
-            subtasks=False, fields=None, full=False,
+            space="staging", list_id=None, include_closed=False, include_archived=False, status=None,
+            subtasks=False, tags=None, fields=None, full=False,
         )
         result = cmd_tasks_list(client, args)
         self.assertEqual(result["count"], 1)
         self.assertEqual(result["tasks"][0]["id"], "t1")
 
     def test_multi_page(self):
-        from clickup_cli.commands.tasks import cmd_tasks_list
         client = FakeClient(
             task_pages=[
                 {
@@ -792,8 +852,8 @@ class TasksListPaginationTests(unittest.TestCase):
             ]
         )
         args = Namespace(
-            space="staging", list_id=None, include_closed=False, status=None,
-            subtasks=False, fields=None, full=False,
+            space="staging", list_id=None, include_closed=False, include_archived=False, status=None,
+            subtasks=False, tags=None, fields=None, full=False,
         )
         result = cmd_tasks_list(client, args)
         self.assertEqual(result["count"], 3)
@@ -801,7 +861,6 @@ class TasksListPaginationTests(unittest.TestCase):
         self.assertEqual(ids, ["t1", "t2", "t3"])
 
     def test_full_flag_returns_raw(self):
-        from clickup_cli.commands.tasks import cmd_tasks_list
         client = FakeClient(
             task_pages=[
                 {
@@ -813,8 +872,8 @@ class TasksListPaginationTests(unittest.TestCase):
             ]
         )
         args = Namespace(
-            space="staging", list_id=None, include_closed=False, status=None,
-            subtasks=False, fields=None, full=True,
+            space="staging", list_id=None, include_closed=False, include_archived=False, status=None,
+            subtasks=False, tags=None, fields=None, full=True,
         )
         result = cmd_tasks_list(client, args)
         self.assertIn("extra", result["tasks"][0])
