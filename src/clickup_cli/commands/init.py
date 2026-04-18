@@ -137,6 +137,7 @@ def cmd_init(args):
     config_dir = os.path.expanduser("~/.config/clickup-cli")
     config_path = os.path.join(config_dir, "config.json")
     os.makedirs(config_dir, mode=0o700, exist_ok=True)
+    os.chmod(config_dir, 0o700)
 
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)

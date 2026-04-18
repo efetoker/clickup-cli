@@ -1746,7 +1746,13 @@ class InitTokenFlagTests(unittest.TestCase):
         mock_makedirs.assert_called_once_with(
             unittest.mock.ANY, mode=0o700, exist_ok=True
         )
-        mock_chmod.assert_called_once_with(unittest.mock.ANY, 0o600)
+        self.assertEqual(
+            mock_chmod.call_args_list,
+            [
+                unittest.mock.call(unittest.mock.ANY, 0o700),
+                unittest.mock.call(unittest.mock.ANY, 0o600),
+            ],
+        )
 
 
 class InitErrorTests(unittest.TestCase):
