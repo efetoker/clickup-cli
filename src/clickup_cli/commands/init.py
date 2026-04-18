@@ -115,16 +115,8 @@ def cmd_init(args):
     for s in spaces_raw:
         # Use lowercase name as key, sanitized for CLI use
         key = s["name"].lower().replace(" ", "-")
-        lists_resp = requests.get(
-            f"https://api.clickup.com/api/v2/space/{s['id']}/list",
-            headers=headers,
-            timeout=15,
-        )
-        lists = lists_resp.json().get("lists", [])
-        default_list_id = lists[0]["id"] if lists else ""
-        spaces[key] = {"space_id": str(s["id"]), "list_id": default_list_id}
-        status = f" (default list: {default_list_id})" if default_list_id else " (no lists)"
-        print(f"  {key}: {s['name']}{status}", file=sys.stderr)
+        spaces[key] = {"space_id": str(s["id"])}
+        print(f"  {key}: {s['name']}", file=sys.stderr)
 
     config = {
         "api_token": token,

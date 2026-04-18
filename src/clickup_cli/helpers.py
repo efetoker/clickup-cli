@@ -72,15 +72,18 @@ def read_content(inline, file_path, flag_name="--content"):
     return inline
 
 
-def resolve_space_id(space_arg):
-    """Resolve a space name (from config) or raw space ID."""
-    from .config import SPACES
+def resolve_space_id(space_arg, spaces=None):
+    """Resolve a space name (from config/runtime) or raw space ID."""
+    if spaces is None:
+        from .config import SPACES
 
-    if space_arg in SPACES:
-        return SPACES[space_arg]["space_id"]
+        spaces = SPACES
+
+    if space_arg in spaces:
+        return spaces[space_arg]["space_id"]
     # If it's not numeric, it's likely a misspelled config name
     if not space_arg.isdigit():
-        available = ", ".join(sorted(SPACES.keys())) if SPACES else "(none configured)"
+        available = ", ".join(sorted(spaces.keys())) if spaces else "(none configured)"
         error(f"Unknown space: {space_arg}. Available: {available}")
     return space_arg
 

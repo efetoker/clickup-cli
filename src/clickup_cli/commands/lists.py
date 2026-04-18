@@ -1,6 +1,5 @@
 """List command handlers — list, get, create, update, delete, privacy."""
 
-from ..config import WORKSPACE_ID
 from ..helpers import read_content, error, resolve_space_id, add_id_argument
 
 
@@ -309,7 +308,7 @@ def cmd_lists_privacy(client, args):
     """Set a list private or public via the v3 ACLs endpoint."""
     private = bool(args.private)
     body = {"private": private}
-    path = f"/workspaces/{WORKSPACE_ID}/list/{args.list_id}/acls"
+    path = f"/workspaces/{client.runtime.workspace_id}/list/{args.list_id}/acls"
 
     if client.dry_run:
         return {

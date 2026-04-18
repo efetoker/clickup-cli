@@ -1,6 +1,5 @@
 """Folder command handlers — list, get, create, update, delete, privacy."""
 
-from ..config import WORKSPACE_ID
 from ..helpers import error, resolve_space_id, add_id_argument
 
 
@@ -247,7 +246,7 @@ def cmd_folders_privacy(client, args):
     """Set a folder private or public via the v3 ACLs endpoint."""
     private = bool(args.private)
     body = {"private": private}
-    path = f"/workspaces/{WORKSPACE_ID}/folder/{args.folder_id}/acls"
+    path = f"/workspaces/{client.runtime.workspace_id}/folder/{args.folder_id}/acls"
 
     if client.dry_run:
         return {

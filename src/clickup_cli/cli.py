@@ -7,6 +7,7 @@ import sys
 from . import __version__
 from .client import ClickUpClient
 from .helpers import output, error, resolve_id_args
+from .runtime import RuntimeContext
 
 
 GLOBAL_FLAGS = {"--pretty", "--dry-run", "--debug"}
@@ -169,7 +170,18 @@ def main():
             "No API token found. Set CLICKUP_API_TOKEN or run: clickup init"
         )
 
-    client = ClickUpClient(token, dry_run=args.dry_run, debug=args.debug)
+    runtime = RuntimeContext(
+        workspace_id=str(config.get("workspace_id", "")),
+        user_id=str(config.get("user_id", "")),
+        spaces=config.get("spaces", {}),
+    )
+
+    client = ClickUpClient(
+        token,
+        dry_run=args.dry_run,
+        debug=args.debug,
+        runtime=runtime,
+    )
     result = dispatch(client, args)
 
     if result is not None:

@@ -1,6 +1,5 @@
 """Space command handlers — list, get, statuses, privacy."""
 
-from ..config import WORKSPACE_ID
 from ..helpers import resolve_space_id, add_id_argument
 
 
@@ -147,7 +146,7 @@ notes:
 
 def cmd_spaces_list(client, args):
     """List all spaces in the workspace."""
-    resp = client.get_v2(f"/team/{WORKSPACE_ID}/space")
+    resp = client.get_v2(f"/team/{client.runtime.workspace_id}/space")
     spaces = resp.get("spaces", [])
     return {"spaces": spaces, "count": len(spaces)}
 
@@ -183,7 +182,7 @@ def cmd_spaces_privacy(client, args):
     space_id = resolve_space_id(args.space)
     private = bool(args.private)
     body = {"private": private}
-    path = f"/workspaces/{WORKSPACE_ID}/space/{space_id}/acls"
+    path = f"/workspaces/{client.runtime.workspace_id}/space/{space_id}/acls"
 
     if client.dry_run:
         return {

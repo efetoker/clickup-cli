@@ -22,6 +22,8 @@ clickup init
 
 This prompts for your API token, discovers your workspaces and spaces, identifies your user, and writes a config file to `~/.config/clickup-cli/config.json`.
 
+`clickup init` stores each configured space alias with its canonical `space_id`. It does not preload one list per space during setup. Add `list_id` later only if you want a cached default list for list-bound commands.
+
 If you have a single workspace, it's selected automatically. Same for user detection in single-member workspaces.
 
 Get your API token at [app.clickup.com/settings/apps](https://app.clickup.com/settings/apps).
@@ -96,7 +98,7 @@ clickup tasks list --space <name> --pretty
 ## Key Behaviors
 
 - **Flag aliases** — every positional argument also accepts a `--flag` form. `tasks get abc123` and `tasks get --task-id abc123` are equivalent. Same for `--query`, `--doc-id`, `--page-id`, `--folder-id`, `--list-id`, `--comment-id`, `--space`.
-- **Raw numeric IDs** on `--space` and `--folder` flags are accepted transparently alongside config aliases. On tasks commands, a raw space ID resolves to its first folderless list via one API call.
+- **Raw numeric IDs** on `--space` and `--folder` flags are accepted transparently alongside config aliases. On tasks commands, list-bound commands may resolve a raw space ID to its first folderless list via one API call.
 - **`tasks create`** auto-infers `--space` from `--list` via API lookup. You can omit `--space` if `--list` is provided.
 - **`tasks update`** handles core fields, assignee diffs (`--add-assignee` / `--remove-assignee`), tag diffs (`--add-tag` / `--remove-tag`), and custom fields (`--custom-field FIELD_ID=VALUE`) in one call. All flags are repeatable; `--dry-run` returns a structured plan.
 - **`tasks depend`** — `add`, `remove`, and `list` for task dependencies. Direction required on add/remove via `--depends-on` or `--depended-on-by`.
@@ -120,10 +122,13 @@ clickup tasks list --space <name> --pretty
   "workspace_id": "12345",
   "user_id": "67890",
   "spaces": {
-    "myspace": {"space_id": "111", "list_id": "222"}
+    "myspace": {"space_id": "111"},
+    "myspace-with-default-list": {"space_id": "111", "list_id": "222"}
   }
 }
 ```
+
+`space_id` is the identity of a configured alias. `list_id` is optional convenience for commands that need a default list; space-scoped commands should still target the full space. Reverting Phase 3 restores the older eager list caching setup and example shape.
 
 ### Config resolution order
 

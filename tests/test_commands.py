@@ -6,6 +6,7 @@ import io
 import tempfile
 import unittest
 from argparse import Namespace
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import requests
@@ -76,8 +77,17 @@ from clickup_cli.commands.init import cmd_init
 class FlexClient:
     """Flexible fake client for testing command handlers."""
 
-    def __init__(self, dry_run=False, responses=None):
+    def __init__(self, dry_run=False, responses=None, runtime=None):
         self.dry_run = dry_run
+        self.runtime = runtime or SimpleNamespace(
+            workspace_id="test_workspace",
+            user_id="",
+            spaces={
+                "testspace": {"space_id": "111", "list_id": "222"},
+                "dev": {"space_id": "333", "list_id": "444"},
+                "staging": {"space_id": "555", "list_id": "666"},
+            },
+        )
         self._responses = responses or {}
         self._default_response = {"ok": True}
         self.calls = []
@@ -354,6 +364,16 @@ class DocsListTests(unittest.TestCase):
         params = client.calls[0]["params"]
         self.assertEqual(params["parent_id"], "111")
         self.assertEqual(params["parent_type"], "SPACE")
+
+    def test_list_uses_runtime_workspace_id(self):
+        client = FlexClient(
+            responses={"/docs": {"docs": [{"id": "d1"}]}},
+            runtime=SimpleNamespace(workspace_id="runtime_ws", user_id="", spaces={}),
+        )
+
+        cmd_docs_list(client, Namespace(space=None))
+
+        self.assertIn("/workspaces/runtime_ws/docs", client.calls[0]["path"])
 
     def test_list_pagination(self):
         call_count = [0]
@@ -663,6 +683,15 @@ class FoldersPrivacyTests(unittest.TestCase):
         self.assertEqual(result["body"], {"private": True})
         self.assertEqual(client.calls, [])
 
+    def test_uses_runtime_workspace_id(self):
+        client = FlexClient(
+            runtime=SimpleNamespace(workspace_id="runtime_ws", user_id="", spaces={})
+        )
+
+        cmd_folders_privacy(client, Namespace(folder_id="f1", private=True, public=False))
+
+        self.assertIn("/workspaces/runtime_ws/folder/f1/acls", client.calls[0]["path"])
+
 
 # ─── Lists ────────────────────────────────────────────────────────────────
 
@@ -831,6 +860,15 @@ class ListsPrivacyTests(unittest.TestCase):
         self.assertEqual(result["body"], {"private": True})
         self.assertEqual(client.calls, [])
 
+    def test_uses_runtime_workspace_id(self):
+        client = FlexClient(
+            runtime=SimpleNamespace(workspace_id="runtime_ws", user_id="", spaces={})
+        )
+
+        cmd_lists_privacy(client, Namespace(list_id="l1", private=True, public=False))
+
+        self.assertIn("/workspaces/runtime_ws/list/l1/acls", client.calls[0]["path"])
+
 
 # ─── Spaces ───────────────────────────────────────────────────────────────
 
@@ -844,6 +882,16 @@ class SpacesListTests(unittest.TestCase):
         args = Namespace()
         result = cmd_spaces_list(client, args)
         self.assertEqual(result["count"], 2)
+
+    def test_list_uses_runtime_workspace_id(self):
+        client = FlexClient(
+            responses={"/space": {"spaces": [{"id": "s1"}]}},
+            runtime=SimpleNamespace(workspace_id="runtime_ws", user_id="", spaces={}),
+        )
+
+        cmd_spaces_list(client, Namespace())
+
+        self.assertIn("/team/runtime_ws/space", client.calls[0]["path"])
 
 
 class SpacesGetTests(unittest.TestCase):
@@ -934,6 +982,15 @@ class SpacesPrivacyTests(unittest.TestCase):
         args = Namespace(space="999999", private=True, public=False)
         cmd_spaces_privacy(client, args)
         self.assertIn("/space/999999/acls", client.calls[0]["path"])
+
+    def test_privacy_uses_runtime_workspace_id(self):
+        client = FlexClient(
+            runtime=SimpleNamespace(workspace_id="runtime_ws", user_id="", spaces={})
+        )
+
+        cmd_spaces_privacy(client, Namespace(space="999999", private=True, public=False))
+
+        self.assertIn("/workspaces/runtime_ws/space/999999/acls", client.calls[0]["path"])
 
 
 # ─── Tags ─────────────────────────────────────────────────────────────────
@@ -1030,6 +1087,23 @@ class TeamWhoamiTests(unittest.TestCase):
         # When no teams, _get_workspace returns the raw resp dict
         # which has "teams" key, and whoami wraps it
         self.assertEqual(result["member_count"], 0)
+
+    def test_whoami_prefers_runtime_workspace_id(self):
+        client = FlexClient(
+            responses={
+                "/team": {
+                    "teams": [
+                        {"id": "other_ws", "name": "Other", "members": []},
+                        {"id": "runtime_ws", "name": "Runtime", "members": []},
+                    ]
+                }
+            },
+            runtime=SimpleNamespace(workspace_id="runtime_ws", user_id="", spaces={}),
+        )
+
+        result = cmd_team_whoami(client, Namespace())
+
+        self.assertEqual(result["workspace"]["id"], "runtime_ws")
 
 
 class TeamMembersTests(unittest.TestCase):
@@ -1135,6 +1209,27 @@ class TasksMoveTests(unittest.TestCase):
         self.assertTrue(result["dry_run"])
         self.assertEqual(result["destination_list_id"], "222")
 
+    def test_move_uses_runtime_workspace_and_lazy_default_list(self):
+        client = FlexClient(
+            responses={
+                "/space/runtime_space/list": {"lists": [{"id": "runtime_list"}]},
+                "/home_list/": {"id": "t1"},
+            },
+            runtime=SimpleNamespace(
+                workspace_id="runtime_ws",
+                user_id="",
+                spaces={"runtime": {"space_id": "runtime_space"}},
+            ),
+        )
+
+        cmd_tasks_move(client, Namespace(task_id="t1", to_list="runtime"))
+
+        self.assertIn("/space/runtime_space/list", client.calls[0]["path"])
+        self.assertIn(
+            "/workspaces/runtime_ws/tasks/t1/home_list/runtime_list",
+            client.calls[-1]["path"],
+        )
+
 
 class TasksMergeTests(unittest.TestCase):
 
@@ -1169,6 +1264,33 @@ class TasksListDryRunTests(unittest.TestCase):
                          status=None, subtasks=False, fields=None, full=False)
         result = cmd_tasks_list(client, args)
         self.assertEqual(result["list_id"], "custom_list")
+
+    def test_list_alias_without_cached_list_uses_lazy_lookup(self):
+        client = FlexClient(
+            dry_run=True,
+            responses={"/space/runtime_space/list": {"lists": [{"id": "runtime_list"}]}},
+            runtime=SimpleNamespace(
+                workspace_id="runtime_ws",
+                user_id="",
+                spaces={"runtime": {"space_id": "runtime_space"}},
+            ),
+        )
+
+        result = cmd_tasks_list(
+            client,
+            Namespace(
+                space="runtime",
+                list_id=None,
+                include_closed=False,
+                status=None,
+                subtasks=False,
+                fields=None,
+                full=False,
+            ),
+        )
+
+        self.assertEqual(result["list_id"], "runtime_list")
+        self.assertEqual(client.calls[0]["path"], "/space/runtime_space/list")
 
 
 class TasksUpdateBehaviorTests(unittest.TestCase):
@@ -1440,6 +1562,27 @@ class TasksSearchBehaviorTests(unittest.TestCase):
             search_call["params"]["list_ids[]"],
             ["folderless-1", "shared", "folder-list-1", "folder-list-2"],
         )
+
+    def test_space_scoping_uses_runtime_space_alias_and_workspace_id(self):
+        client = FlexClient(
+            responses={
+                "/space/runtime_space/list": {"lists": [{"id": "runtime-folderless"}]},
+                "/space/runtime_space/folder": {"folders": []},
+                "/task": {"tasks": [], "last_page": True},
+            },
+            runtime=SimpleNamespace(
+                workspace_id="runtime_ws",
+                user_id="",
+                spaces={"runtime": {"space_id": "runtime_space"}},
+            ),
+        )
+
+        cmd_tasks_search(client, self._make_search_args(space="runtime"))
+
+        self.assertIn("/space/runtime_space/list", client.calls[0]["path"])
+        search_call = next(call for call in client.calls if call["path"].endswith("/task"))
+        self.assertEqual(search_call["path"], "/team/runtime_ws/task")
+        self.assertEqual(search_call["params"]["list_ids[]"], ["runtime-folderless"])
 
     def test_space_scoping_expands_raw_space_id_to_all_lists_in_space(self):
         client = self._search_client_for_full_space_scope()
@@ -2204,13 +2347,6 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
         resp.json.return_value = {"spaces": spaces or []}
         return resp
 
-    def _make_lists_response(self, lists=None):
-        resp = MagicMock()
-        resp.status_code = 200
-        resp.ok = True
-        resp.json.return_value = {"lists": lists or []}
-        return resp
-
     @patch("clickup_cli.commands.init.requests.get")
     def test_single_workspace_auto_selects(self, mock_get):
         """Single workspace is auto-selected without prompting."""
@@ -2274,19 +2410,17 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
 
     @patch("clickup_cli.commands.init.requests.get")
     def test_spaces_fetched_and_config_written(self, mock_get):
-        """Spaces are fetched and included in the config file."""
+        """Spaces are written with canonical space_id values only."""
         team = {"id": "ws1", "name": "MyWS",
                 "members": [{"user": {"id": "u1", "username": "testuser"}}]}
 
         spaces_resp = self._make_spaces_response([
             {"id": "s1", "name": "Personal"},
         ])
-        lists_resp = self._make_lists_response([{"id": "L1"}])
 
         mock_get.side_effect = [
             self._make_team_response([team]),
             spaces_resp,
-            lists_resp,  # lists fetch for space "Personal"
         ]
         args = Namespace(token="pk_test")
         with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
@@ -2297,7 +2431,8 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
         written_text = "".join(call[0][0] for call in written)
         self.assertIn("personal", written_text)
         self.assertIn("s1", written_text)
-        self.assertIn("L1", written_text)
+        self.assertNotIn("list_id", written_text)
+        self.assertEqual(mock_get.call_count, 2)
 
     @patch("clickup_cli.commands.init.requests.get")
     def test_eof_during_workspace_selection_exits(self, mock_get):

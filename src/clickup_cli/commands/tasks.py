@@ -5,8 +5,14 @@ import sys
 
 import requests
 
-from ..config import WORKSPACE_ID, SPACES
-from ..helpers import read_content, error, format_tasks, fetch_all_comments, add_id_argument
+from ..helpers import (
+    read_content,
+    error,
+    format_tasks,
+    fetch_all_comments,
+    add_id_argument,
+    resolve_space_id,
+)
 
 
 def register_parser(subparsers, F):
@@ -653,17 +659,17 @@ def _resolve_list_id(args, client=None):
     if hasattr(args, "list_id") and args.list_id:
         return args.list_id
     if hasattr(args, "space") and args.space:
-        space = SPACES.get(args.space)
-        if space:
-            return space["list_id"]
-        if args.space.isdigit():
-            if client is None:
-                error(
-                    f"Raw space ID {args.space} needs an API lookup but no "
-                    "client is available. Use --list <list_id> instead."
-                )
-            return _first_folderless_list_id(client, args.space)
-        error(f"Unknown space: {args.space}. Check your config file.")
+        if client is None:
+            error(
+                f"Space {args.space} needs an API lookup but no client is available. "
+                "Use --list <list_id> instead."
+            )
+        spaces = client.runtime.spaces
+        space_cfg = spaces.get(args.space)
+        if space_cfg and space_cfg.get("list_id"):
+            return space_cfg["list_id"]
+        space_id = resolve_space_id(args.space, spaces=spaces)
+        return _first_folderless_list_id(client, space_id)
     error("Provide either --space <name|id> or --list <list_id>")
 
 
@@ -679,21 +685,9 @@ def _first_folderless_list_id(client, space_id):
     return lists[0]["id"]
 
 
-def _resolve_space_id(space_arg):
-    """Resolve a --space alias or raw ID to a concrete space ID."""
-    if not space_arg:
-        return None
-    space = SPACES.get(space_arg)
-    if space:
-        return space["space_id"]
-    if space_arg.isdigit():
-        return space_arg
-    error(f"Unknown space: {space_arg}. Check your config file.")
-
-
 def _resolve_scope_list_ids(client, space_arg, include_archived=False, allow_empty=False):
     """Resolve --space to every list ID in that space for search scoping."""
-    space_id = _resolve_space_id(space_arg)
+    space_id = resolve_space_id(space_arg, spaces=client.runtime.spaces)
     params = {"archived": "true"} if include_archived else None
 
     folderless_resp = client.get_v2(
@@ -810,7 +804,7 @@ def _infer_space_from_list(client, list_id):
     space_id = space_info.get("id")
     if not space_id:
         return None
-    for name, cfg in SPACES.items():
+    for name, cfg in client.runtime.spaces.items():
         if cfg.get("space_id") == str(space_id):
             return name
     return str(space_id)
@@ -959,7 +953,7 @@ def cmd_tasks_search(client, args):
 
     all_tasks = []
     if run_active_search:
-        all_tasks = _paginate_tasks(client, f"/team/{WORKSPACE_ID}/task", params)
+        all_tasks = _paginate_tasks(client, f"/team/{client.runtime.workspace_id}/task", params)
 
     if getattr(args, "include_archived", False):
         archived_params = dict(params)
@@ -981,7 +975,7 @@ def cmd_tasks_search(client, args):
                 run_archived_search = False
         if run_archived_search:
             all_tasks.extend(
-                _paginate_tasks(client, f"/team/{WORKSPACE_ID}/task", archived_params)
+                _paginate_tasks(client, f"/team/{client.runtime.workspace_id}/task", archived_params)
             )
 
     if name_prefix:
@@ -1008,8 +1002,11 @@ def cmd_tasks_delete(client, args):
 
 def cmd_tasks_move(client, args):
     """Move a task to a different list (v3 endpoint)."""
-    space = SPACES.get(args.to_list)
-    list_id = space["list_id"] if space else args.to_list
+    space = client.runtime.spaces.get(args.to_list)
+    if space:
+        list_id = space.get("list_id") or _first_folderless_list_id(client, space["space_id"])
+    else:
+        list_id = args.to_list
 
     if client.dry_run:
         return {
@@ -1019,7 +1016,7 @@ def cmd_tasks_move(client, args):
             "destination_list_id": list_id,
         }
     return client.put_v3(
-        f"/workspaces/{WORKSPACE_ID}/tasks/{args.task_id}/home_list/{list_id}"
+        f"/workspaces/{client.runtime.workspace_id}/tasks/{args.task_id}/home_list/{list_id}"
     )
 
 

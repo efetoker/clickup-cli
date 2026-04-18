@@ -1,7 +1,5 @@
 """Team command handlers — whoami, members."""
 
-from ..config import WORKSPACE_ID
-
 
 def register_parser(subparsers, F):
     """Register all team subcommands on the given subparsers object."""
@@ -69,7 +67,7 @@ def _get_workspace(client):
     resp = client.get_v2("/team")
     teams = resp.get("teams", [])
     for team in teams:
-        if str(team.get("id")) == WORKSPACE_ID:
+        if str(team.get("id")) == client.runtime.workspace_id:
             return team
     # Shouldn't happen, but return first team if workspace ID doesn't match
     if teams:

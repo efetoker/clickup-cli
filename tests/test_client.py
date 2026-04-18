@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import requests
 
 from clickup_cli.client import ClickUpClient
+from clickup_cli.runtime import RuntimeContext
 
 
 class ClientSetupMixin:
@@ -99,6 +100,19 @@ class DebugLoggingTests(ClientSetupMixin, unittest.TestCase):
             sys.stderr = old_stderr
 
         self.assertIn("body:", captured.getvalue())
+
+
+class RuntimeContextTests(ClientSetupMixin, unittest.TestCase):
+    def test_client_keeps_explicit_runtime_context(self):
+        runtime = RuntimeContext(
+            workspace_id="ws_123",
+            user_id="user_456",
+            spaces={"dev": {"space_id": "space_789"}},
+        )
+
+        client = self._make_client(runtime=runtime)
+
+        self.assertIs(client.runtime, runtime)
 
 
 class RateLimitTests(ClientSetupMixin, unittest.TestCase):

@@ -4,6 +4,7 @@ import sys
 import time
 import unittest
 from argparse import Namespace
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from clickup_cli import cli
@@ -28,10 +29,19 @@ from clickup_cli.helpers import (
 
 
 class FakeClient:
-    def __init__(self, dry_run=False, task_pages=None, page_content=""):
+    def __init__(self, dry_run=False, task_pages=None, page_content="", runtime=None):
         self.dry_run = dry_run
         self.task_pages = task_pages or []
         self.page_content = page_content
+        self.runtime = runtime or SimpleNamespace(
+            workspace_id="test_workspace",
+            user_id="",
+            spaces={
+                "testspace": {"space_id": "111", "list_id": "222"},
+                "dev": {"space_id": "333", "list_id": "444"},
+                "staging": {"space_id": "555", "list_id": "666"},
+            },
+        )
         self.v2_calls = []
         self.v3_get_calls = []
         self.v3_put_calls = []
@@ -1180,12 +1190,24 @@ class MainFunctionTests(unittest.TestCase):
     @patch("clickup_cli.cli.output")
     @patch("clickup_cli.cli.dispatch", return_value={"tasks": []})
     @patch("clickup_cli.cli.ClickUpClient")
-    @patch("clickup_cli.config.load_config", return_value={"api_token": "pk_test"})
+    @patch(
+        "clickup_cli.config.load_config",
+        return_value={
+            "api_token": "pk_test",
+            "workspace_id": "ws_123",
+            "user_id": "user_456",
+            "spaces": {"dev": {"space_id": "space_789"}},
+        },
+    )
     def test_main_normal_dispatch_calls_output(self, mock_config, mock_client_cls,
-                                                mock_dispatch, mock_output):
+                                                 mock_dispatch, mock_output):
         """Normal dispatch path: result is not None, output() is called."""
         from clickup_cli.cli import main
         main()
+        runtime = mock_client_cls.call_args.kwargs["runtime"]
+        self.assertEqual(runtime.workspace_id, "ws_123")
+        self.assertEqual(runtime.user_id, "user_456")
+        self.assertEqual(runtime.spaces, {"dev": {"space_id": "space_789"}})
         mock_output.assert_called_once_with({"tasks": []}, pretty=False)
 
 

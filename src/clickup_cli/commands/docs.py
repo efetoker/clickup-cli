@@ -1,6 +1,5 @@
 """Doc command handlers — list, get, create, pages, get-page, edit-page, create-page."""
 
-from ..config import WORKSPACE_ID
 from ..helpers import read_content, error, add_id_argument, resolve_space_id
 
 
@@ -326,7 +325,7 @@ def cmd_docs_list(client, args):
     while True:
         if cursor:
             params["cursor"] = cursor
-        resp = client.get_v3(f"/workspaces/{WORKSPACE_ID}/docs", params=params)
+        resp = client.get_v3(f"/workspaces/{client.runtime.workspace_id}/docs", params=params)
         docs = resp.get("docs", [])
         all_docs.extend(docs)
         cursor = resp.get("next_cursor")
@@ -337,7 +336,7 @@ def cmd_docs_list(client, args):
 
 
 def cmd_docs_get(client, args):
-    return client.get_v3(f"/workspaces/{WORKSPACE_ID}/docs/{args.doc_id}")
+    return client.get_v3(f"/workspaces/{client.runtime.workspace_id}/docs/{args.doc_id}")
 
 
 def cmd_docs_create(client, args):
@@ -353,14 +352,14 @@ def cmd_docs_create(client, args):
     if client.dry_run:
         return {"dry_run": True, "action": "create_doc", "body": body}
 
-    doc = client.post_v3(f"/workspaces/{WORKSPACE_ID}/docs", data=body)
+    doc = client.post_v3(f"/workspaces/{client.runtime.workspace_id}/docs", data=body)
 
     # If content provided, write it to the auto-created default page
     if content and not client.dry_run:
         doc_id = doc.get("id")
         if doc_id:
             pages = client.get_v3(
-                f"/workspaces/{WORKSPACE_ID}/docs/{doc_id}/pages",
+                f"/workspaces/{client.runtime.workspace_id}/docs/{doc_id}/pages",
                 params={"content_format": "text/md"},
             )
             page_list = pages if isinstance(pages, list) else pages.get("pages", [])
@@ -368,7 +367,7 @@ def cmd_docs_create(client, args):
                 page_id = page_list[0].get("id")
                 if page_id:
                     client.put_v3(
-                        f"/workspaces/{WORKSPACE_ID}/docs/{doc_id}/pages/{page_id}",
+                        f"/workspaces/{client.runtime.workspace_id}/docs/{doc_id}/pages/{page_id}",
                         data={"content": content, "content_format": "text/md"},
                     )
                     doc["_initial_content_written"] = True
@@ -380,7 +379,7 @@ def cmd_docs_create(client, args):
 def cmd_docs_pages(client, args):
     params = {"content_format": "text/md"}
     return client.get_v3(
-        f"/workspaces/{WORKSPACE_ID}/docs/{args.doc_id}/pages", params=params
+        f"/workspaces/{client.runtime.workspace_id}/docs/{args.doc_id}/pages", params=params
     )
 
 
@@ -388,7 +387,7 @@ def cmd_docs_get_page(client, args):
     fmt = "text/md" if args.format == "md" else "text/plain"
     params = {"content_format": fmt}
     return client.get_v3(
-        f"/workspaces/{WORKSPACE_ID}/docs/{args.doc_id}/pages/{args.page_id}",
+        f"/workspaces/{client.runtime.workspace_id}/docs/{args.doc_id}/pages/{args.page_id}",
         params=params,
     )
 
@@ -401,7 +400,7 @@ def cmd_docs_edit_page(client, args):
         if not content:
             error("--append requires --content or --content-file")
         page = client.get_v3(
-            f"/workspaces/{WORKSPACE_ID}/docs/{args.doc_id}/pages/{args.page_id}",
+            f"/workspaces/{client.runtime.workspace_id}/docs/{args.doc_id}/pages/{args.page_id}",
             params={"content_format": "text/md"},
             allow_dry_run=True,
         )
@@ -428,7 +427,7 @@ def cmd_docs_edit_page(client, args):
         }
 
     return client.put_v3(
-        f"/workspaces/{WORKSPACE_ID}/docs/{args.doc_id}/pages/{args.page_id}",
+        f"/workspaces/{client.runtime.workspace_id}/docs/{args.doc_id}/pages/{args.page_id}",
         data=body,
     )
 
@@ -441,6 +440,6 @@ def cmd_docs_create_page(client, args):
         body["content_format"] = "text/md"
 
     return client.post_v3(
-        f"/workspaces/{WORKSPACE_ID}/docs/{args.doc_id}/pages",
+        f"/workspaces/{client.runtime.workspace_id}/docs/{args.doc_id}/pages",
         data=body,
     )

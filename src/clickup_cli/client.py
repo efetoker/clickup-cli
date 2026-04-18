@@ -7,16 +7,18 @@ import time
 import requests
 
 from .helpers import error
+from .runtime import RuntimeContext
 
 
 class ClickUpClient:
     BASE_V2 = "https://api.clickup.com/api/v2"
     BASE_V3 = "https://api.clickup.com/api/v3"
 
-    def __init__(self, token, dry_run=False, debug=False):
+    def __init__(self, token, dry_run=False, debug=False, runtime=None):
         self.token = token
         self.dry_run = dry_run
         self.debug = debug
+        self.runtime = runtime or RuntimeContext(workspace_id="")
         self.session = requests.Session()
         self.session.headers.update(
             {
