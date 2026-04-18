@@ -1865,6 +1865,74 @@ class TasksIncludeArchivedTests(unittest.TestCase):
             },
         )
 
+    def test_search_space_scope_include_archived_handles_archived_only_space(self):
+        def _space_lists(path, kwargs):
+            params = kwargs.get("params") or {}
+            if params.get("archived") == "true":
+                return {"lists": [{"id": "archived-folderless"}]}
+            return {"lists": []}
+
+        def _space_folders(path, kwargs):
+            params = kwargs.get("params") or {}
+            if params.get("archived") == "true":
+                return {"folders": [{"id": "archived-folder"}]}
+            return {"folders": []}
+
+        def _folder_lists(path, kwargs):
+            if "/folder/archived-folder/list" in path:
+                return {"lists": [{"id": "archived-folder-list"}]}
+            return {"lists": []}
+
+        def _tasks(path, kwargs):
+            params = kwargs.get("params") or {}
+            list_ids = params.get("list_ids[]", [])
+            archived = params.get("archived")
+            task_id = "+".join(list_ids) or "unscoped"
+            return {
+                "tasks": [
+                    {
+                        "id": f"{archived or 'active'}:{task_id}",
+                        "name": "task",
+                        "status": {"status": "open"},
+                        "priority": None,
+                        "url": "u",
+                    }
+                ],
+                "last_page": True,
+            }
+
+        client = FlexClient(
+            responses={
+                "/space/111/list": _space_lists,
+                "/space/111/folder": _space_folders,
+                "/folder/": _folder_lists,
+                "/task": _tasks,
+            }
+        )
+        args = Namespace(
+            query="bug",
+            include_closed=False,
+            include_archived=True,
+            space="111",
+            list_id=None,
+            folder_id=None,
+            name_prefix=None,
+            tags=None,
+            fields=None,
+            full=False,
+        )
+
+        result = cmd_tasks_search(client, args)
+
+        task_ids = {task["id"] for task in result["tasks"]}
+        self.assertEqual(
+            task_ids,
+            {
+                "active:unscoped",
+                "true:archived-folderless+archived-folder-list",
+            },
+        )
+
 
 # ─── CLI dispatch ─────────────────────────────────────────────────────────
 

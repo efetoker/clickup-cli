@@ -929,7 +929,11 @@ def cmd_tasks_update(client, args):
 def cmd_tasks_search(client, args):
     resolved_space_list_ids = None
     if args.space and not getattr(args, "list_id", None) and not getattr(args, "folder_id", None):
-        resolved_space_list_ids = _resolve_scope_list_ids(client, args.space)
+        resolved_space_list_ids = _resolve_scope_list_ids(
+            client,
+            args.space,
+            allow_empty=getattr(args, "include_archived", False),
+        )
 
     if client.dry_run:
         return {"dry_run": True, "action": "search_tasks", "query": args.query}
