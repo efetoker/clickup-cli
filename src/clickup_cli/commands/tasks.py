@@ -727,8 +727,7 @@ def cmd_tasks_list(client, args):
         params["subtasks"] = "true"
     tag_filter = getattr(args, "tags", None)
     if tag_filter:
-        for tag in tag_filter:
-            params["tags[]"] = tag.lower()
+        params["tags[]"] = [tag.lower() for tag in tag_filter]
 
     all_tasks = _paginate_tasks(client, f"/list/{list_id}/task", params)
 
