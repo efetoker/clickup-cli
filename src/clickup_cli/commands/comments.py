@@ -240,7 +240,7 @@ def cmd_comments_update(client, args):
     """Update an existing comment's text or resolved status."""
     text = read_content(args.text, args.file, "--text")
     body = {}
-    if text:
+    if text is not None:
         body["comment_text"] = text
     if args.resolved is not None:
         body["resolved"] = args.resolved

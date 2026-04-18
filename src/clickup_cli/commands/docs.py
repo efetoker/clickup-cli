@@ -402,7 +402,7 @@ def cmd_docs_edit_page(client, args):
         )
         content = _append_markdown(page.get("content", ""), content)
 
-    if content:
+    if content is not None:
         body["content"] = content
         body["content_format"] = "text/md"
     if args.name:
