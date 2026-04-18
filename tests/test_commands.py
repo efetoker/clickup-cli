@@ -1285,6 +1285,19 @@ class TasksCreateBehaviorTests(unittest.TestCase):
             cfg._config_cache = original
         self.assertNotIn("tags", result["body"])
 
+    def test_empty_inline_description_is_omitted(self):
+        client = FlexClient(dry_run=True)
+        args = self._make_args(desc="")
+        result = cmd_tasks_create(client, args)
+        self.assertNotIn("markdown_description", result["body"])
+
+    def test_empty_file_description_is_omitted(self):
+        client = FlexClient(dry_run=True)
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            args = self._make_args(desc_file=handle.name)
+            result = cmd_tasks_create(client, args)
+        self.assertNotIn("markdown_description", result["body"])
+
     def test_space_inference_produces_empty_stderr(self):
         client = FlexClient(
             dry_run=True,

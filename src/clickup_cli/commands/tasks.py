@@ -799,7 +799,7 @@ def cmd_tasks_create(client, args):
     if args.priority:
         body["priority"] = _resolve_priority(args.priority)
 
-    if desc is not None:
+    if desc:
         body["markdown_description"] = desc
 
     if args.status:
