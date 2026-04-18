@@ -71,6 +71,7 @@ def _save_field_to_config(path, field, value):
         with open(path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
             f.write("\n")
+        os.chmod(path, 0o600)
         print(f"Saved {field} to {path}", file=sys.stderr)
     except (OSError, json.JSONDecodeError):
         pass  # Non-critical — config works in memory even if save fails

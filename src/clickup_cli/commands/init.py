@@ -136,11 +136,13 @@ def cmd_init(args):
     # Write config
     config_dir = os.path.expanduser("~/.config/clickup-cli")
     config_path = os.path.join(config_dir, "config.json")
-    os.makedirs(config_dir, exist_ok=True)
+    os.makedirs(config_dir, mode=0o700, exist_ok=True)
 
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
         f.write("\n")
+
+    os.chmod(config_path, 0o600)
 
     print(f"\nConfig saved to {config_path}", file=sys.stderr)
     print(f"Workspace: {team['name']} ({len(spaces)} spaces)", file=sys.stderr)
