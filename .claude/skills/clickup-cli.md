@@ -32,7 +32,7 @@ Global flags (`--pretty`, `--dry-run`, `--debug`) can appear before or after the
 - Successful output is always JSON on stdout
 - Errors go to stderr with non-zero exit code
 - Use `--pretty` for indented JSON when reading output
-- Use `--full` on task list/search for raw API response
+- On `tasks list` and `tasks search`, default output is compact; `--full` returns full task objects, while `--fields` lets you request a smaller custom shape
 
 ## Common Workflows
 
@@ -46,6 +46,7 @@ clickup tasks get <task_id>
 ```bash
 clickup --dry-run tasks create --space <space_name> --name "Fix auth" --desc "Details"
 clickup tasks create --space <space_name> --name "Fix auth" --desc "Details"
+clickup tasks create --list <list_id> --name "Fix auth" --desc "Details"
 ```
 
 ### Update a task (including tags, assignees, custom fields)
@@ -107,21 +108,12 @@ the ClickUp UI. Hits the v3 ACLs endpoint.
 
 ## Configuration
 
-The CLI loads config from (in order):
-1. `CLICKUP_CONFIG_PATH` env var
-2. `~/.config/clickup-cli/config.json`
-3. `clickup-config.json` in current directory
-
-Or use environment variables only:
-- `CLICKUP_API_TOKEN` (required)
-- `CLICKUP_WORKSPACE_ID` (auto-detected for single-workspace accounts)
-
-Run `clickup init` for interactive setup.
+Use `clickup init` for interactive setup. For config file shape, resolution order, and contributor-facing setup notes, prefer `README.md` and `CONTRIBUTING.md` over this repo-local skill.
 
 ## Key Behaviors
 
 - `tasks get` auto-fetches comments (use `--no-comments` to skip)
 - `tasks search` auto-detects task ID patterns (e.g. "PROJ-39") and applies prefix filtering
-- `tasks create` checks for duplicates before creating (use `--skip-dedup` to bypass)
+- `tasks create` accepts `--space` or `--list`; when only `--list` is provided, the CLI auto-infers the matching configured space alias before resolving the target list
 - Tag names are auto-lowercased (ClickUp API requirement)
 - Doc ID ≠ page ID — always use `docs pages` to find page IDs first

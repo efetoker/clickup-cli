@@ -50,7 +50,8 @@ List all tasks in a list. Results are paginated internally and returned
 as a single JSON object with a tasks array and count.
 
 By default, output is compact (id, name, status, priority, url).
-Use --full for the raw API response, or --fields to pick specific fields.
+Use --full for the full task objects returned by the API, with status
+normalized to a consistent dict shape, or --fields to pick specific fields.
 
 Target the list using --space (uses the space's default list) or
 --list (targets a specific list ID, e.g. one inside a folder).
@@ -79,7 +80,8 @@ examples:
 
 notes:
   Output is compact by default (id, name, status, priority, url).
-  Use --full for raw API response, or --fields for custom field selection.
+  Use --full for full task objects with normalized status shape, or --fields
+  for custom field selection.
   At least one of --space or --list is required.
   If both are given, --list takes precedence.
   Use --subtasks to include nested child tasks (e.g. Epic/Story/Task hierarchies).
@@ -134,7 +136,7 @@ notes:
     tl.add_argument(
         "--full",
         action="store_true",
-        help="Return full raw API response (default is compact: id, name, status, priority, url)",
+        help="Return full task objects, with status normalized to a dict shape (default is compact: id, name, status, priority, url)",
     )
     tl.add_argument(
         "--all-pages",
@@ -195,9 +197,9 @@ examples:
         description="""\
 Create a new task in a list. This is a mutating command.
 
---space is always required (used to resolve the target list).
-By default, the task is created in the space's default list. Use --list
-to target a specific list instead (e.g. one inside a folder).
+Provide --space to use that space's default list, or --list to target a
+specific list directly (e.g. one inside a folder). When --list is provided,
+the CLI can infer --space automatically.
 
 Use --desc for inline text or --desc-file for file-based content.
 Do not use both at the same time.
@@ -217,9 +219,9 @@ examples:
   clickup tasks create --space <name> --name "Read article" --desc-file notes.md
 
 notes:
-  --space is always required (to resolve target list). --list is optional.
+  Provide either --space or --list.
   If --list is given, the task is created in that list instead of the
-  space's default list.
+  space's default list, and --space can usually be omitted.
   --desc and --desc-file are mutually exclusive. Using both is an error.
   --assign assigns the task to a user ID.
   Does not support: checklists, custom fields, attachments, or due dates.""",
@@ -366,7 +368,8 @@ Search tasks across the workspace by a text query.
 
 Results are paginated internally and returned as a single JSON object.
 By default, output is compact (id, name, status, priority, url).
-Use --full for the raw API response, or --fields to pick specific fields.
+Use --full for the full task objects returned by the API, with status
+normalized to a consistent dict shape, or --fields to pick specific fields.
 
 Use --space, --list, or --folder to scope results. Use `--space` to search the
 whole space across every list it owns. Without any scope filter, results may
@@ -390,7 +393,8 @@ examples:
 
 notes:
   Output is compact by default (id, name, status, priority, url).
-  Use --full for raw API response, or --fields for custom field selection.
+  Use --full for full task objects with normalized status shape, or --fields
+  for custom field selection.
   Queries matching the pattern ABC-123 auto-apply --name-prefix.
   Use --space, --list, or --folder to scope results.
   Use `--space` to search the whole space across every list it owns.
@@ -445,7 +449,7 @@ notes:
     ts.add_argument(
         "--full",
         action="store_true",
-        help="Return full raw API response (default is compact: id, name, status, priority, url)",
+        help="Return full task objects, with status normalized to a dict shape (default is compact: id, name, status, priority, url)",
     )
     ts.add_argument(
         "--all-pages",

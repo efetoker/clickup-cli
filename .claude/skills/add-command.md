@@ -11,6 +11,7 @@ Follow these steps in order when adding a new command or subcommand.
 
 - If this is a new command group, create `src/clickup_cli/commands/<group>.py`
 - If extending an existing group, add the handler function to the existing file
+- For `tasks`, keep `src/clickup_cli/commands/tasks.py` as the public facade and put new parser/read/write internals under `src/clickup_cli/commands/tasks_internal/` when appropriate
 - Handler signature: `def cmd_<group>_<command>(client, args):`
 - Return a dict (will be output as JSON)
 - Mutating commands must check `client.dry_run` and return a dry-run preview instead of calling the API
@@ -19,7 +20,7 @@ Follow these steps in order when adding a new command or subcommand.
 
 - Each command module owns its parser via `register_parser(subparsers, F)`
 - If extending an existing group, add the new subparser inside the existing `register_parser()`
-- If creating a new group, add a `register_parser(subparsers, F)` function that creates the group parser and all its subparsers
+- If creating a new group, expose a `COMMAND_MANIFEST` with `group`, `register_parser`, and `handlers`
 - Add the subparser with:
   - `description=` — what this command does
   - `epilog=` — usage examples (at least 2)
@@ -30,14 +31,14 @@ Follow these steps in order when adding a new command or subcommand.
 ## 3. Register the handler
 
 - Open `src/clickup_cli/commands/__init__.py`
-- Import the new handler function
-- Add it to the `HANDLERS` dict with key `"<group>_<command>"`
+- Update the owning module's `COMMAND_MANIFEST["handlers"]`
+- For new command groups, import the group's `COMMAND_MANIFEST` and add it to `COMMAND_MANIFESTS`
+- Do not hand-edit `HANDLERS`; it is derived from the manifests
 
-## 3b. Wire up new command groups in cli.py (new groups only)
+## 3b. Root parser wiring
 
-- If this is a new command group, open `src/clickup_cli/cli.py`
-- Import `register_parser` from the new module
-- Call it in `build_parser()` alongside the other `register_parser()` calls
+- `cli.py` already iterates `COMMAND_MANIFESTS`
+- New groups become available once their manifest is added to `src/clickup_cli/commands/__init__.py`
 
 ## 4. Write help text
 
@@ -47,7 +48,11 @@ Follow these steps in order when adding a new command or subcommand.
 
 ## 5. Add tests
 
-- Open `tests/test_cli.py` (or create a new test file if the group is large)
+- Update the relevant split test module in `tests/`:
+- `tests/test_cli.py` for parser/dispatch behavior
+- `tests/test_command_manifest.py` for manifest wiring changes
+- `tests/test_tasks_facade.py` when changing the tasks facade/tasks_internal split
+- `tests/test_commands_<group>.py` or the nearest shared command-family test file for handler coverage
 - Test argument parsing (parser accepts the new args)
 - Test dry-run behavior (mutating commands return dry-run preview)
 - Test core logic with `FakeClient`
@@ -73,3 +78,4 @@ scripts/validate-cli-output.sh
 ## 7. Update the skill (if needed)
 
 If the new command adds a new workflow pattern, update `.claude/skills/clickup-cli.md` with a usage example.
+Prefer pointing contributors to `README.md` or `CONTRIBUTING.md` instead of duplicating general repo guidance here.

@@ -11,10 +11,15 @@ src/clickup_cli/
 ├── cli.py           # root parser, dispatch, main() — delegates to command modules
 ├── client.py        # ClickUpClient API wrapper (rate limiting, dry-run, debug)
 ├── config.py        # Config loader (lazy, fallback chain, workspace auto-detect)
-├── helpers.py       # output(), error(), compact_task(), etc.
+├── helpers.py       # output(), error(), compact_task(), add_id_argument(), etc.
 └── commands/
-    ├── __init__.py  # HANDLERS dict
-    ├── tasks.py     # tasks parser + handlers (list/get/create/update/search/delete/move/merge/depend)
+    ├── __init__.py  # COMMAND_MANIFESTS registry + derived HANDLERS map
+    ├── tasks.py     # compatibility facade for tasks entrypoints
+    ├── tasks_internal/
+    │   ├── parser.py   # tasks parser registration
+    │   ├── read.py     # list/get/search handlers
+    │   ├── write.py    # create/update/delete/move/merge/depend handlers
+    │   └── shared.py   # task-scoped resolution helpers
     ├── comments.py  # comments parser + handlers (list/add/update/delete/thread/reply)
     ├── docs.py      # docs parser + handlers (list/get/create/pages/get-page/edit-page/create-page)
     ├── folders.py   # folders parser + handlers (list/get/create/update/delete/privacy)
@@ -25,7 +30,7 @@ src/clickup_cli/
     └── init.py      # clickup init setup command
 ```
 
-Each command module owns both its argparse parser definition (`register_parser()`) and its handler functions. `cli.py` builds the root parser and delegates to each module's `register_parser(subparsers, F)`.
+Each command group exposes a `COMMAND_MANIFEST` with `group`, `register_parser`, and `handlers`. `cli.py` builds the root parser by iterating `COMMAND_MANIFESTS`, and `commands/__init__.py` derives the dispatch map from those manifests.
 
 ## Argument Pattern: Positional + Flag Aliases
 
@@ -46,7 +51,7 @@ When adding new commands with ID arguments, always use `add_id_argument()` inste
 
 ## Space Inference
 
-`tasks create` auto-infers `--space` from `--list` via a lazy API lookup (`GET /v2/list/{id}`). The `_infer_space_from_list()` function in tasks.py reverse-maps the space ID to a config name. This eliminates the most common agent error.
+`tasks create` accepts either `--space` or `--list`. If only `--list` is provided, it lazily infers the matching configured space alias from `GET /v2/list/{id}` before resolving the target list.
 
 ## Development Setup
 
@@ -61,15 +66,21 @@ scripts/validate-cli-output.sh   # verify JSON stdout contract
 
 ```
 tests/
-├── conftest.py       # test config setup (runs at import time, before clickup_cli loads)
-├── test_cli.py       # argument parsing, dispatch, global flags, resolve_id_args
-├── test_client.py    # ClickUpClient: rate limiting, dry-run, debug mode, HTTP methods
-├── test_commands.py  # all command handlers: tasks, comments, docs, folders, lists, spaces, tags, team
-├── test_config.py    # config loading: file, env vars, fallback chain, workspace auto-detect
-└── test_helpers.py   # output/error helpers, compact_task, add_id_argument, fetch_all_comments pagination
+├── conftest.py                             # test config setup before clickup_cli loads
+├── command_fakes.py                       # shared fake client helpers for command tests
+├── test_cli.py                            # parser, dispatch, global flags, resolve_id_args
+├── test_client.py                         # ClickUpClient behavior
+├── test_command_manifest.py               # manifest registry + derived handlers
+├── test_commands_tasks.py                 # task command handlers
+├── test_commands_docs_comments.py         # docs/comments handlers
+├── test_commands_spaces_lists_folders.py  # spaces/lists/folders handlers
+├── test_commands_misc.py                  # tags/team/init coverage
+├── test_tasks_facade.py                   # tasks facade -> tasks_internal regression coverage
+├── test_config.py                         # config loading
+└── test_helpers.py                        # helpers and pagination utilities
 ```
 
-305 tests, all using `unittest.TestCase` + `FakeClient` pattern (no real HTTP calls).
+See `README.md` and `CONTRIBUTING.md` for contributor-facing usage and workflow details; keep this file focused on repo-local development conventions.
 
 ## CI
 
@@ -78,13 +89,13 @@ GitHub Actions (`ci.yml`): lint + test on Python 3.9, 3.11, 3.13. Runs on push t
 ## Adding a New Command
 
 1. Create or extend a file in `src/clickup_cli/commands/`
-2. Add the handler function and `register_parser()` in the same module
-3. Register the handler in `commands/__init__.py` HANDLERS dict
-4. If it's a new command group, call `register_parser()` from `cli.py`'s `build_parser()`
+2. Add or update that group's `COMMAND_MANIFEST` (`group`, `register_parser`, `handlers`)
+3. If it's a new command group, import its manifest in `commands/__init__.py` and add it to `COMMAND_MANIFESTS`
+4. For `tasks`, keep the public facade in `commands/tasks.py` and put parser/read/write internals in `commands/tasks_internal/` when extending the split structure
 5. Add detailed `--help` text (description + epilog with examples)
 6. Mutating commands must support `--dry-run`
 7. All output goes to stdout as JSON, errors to stderr
-8. Add tests in `tests/`
+8. Add tests in the relevant split test module under `tests/`
 
 ## Rules
 

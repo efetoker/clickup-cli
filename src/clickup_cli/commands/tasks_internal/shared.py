@@ -76,7 +76,19 @@ def _resolve_list_id(args, client=None):
 
 
 def _resolve_scope_list_ids(client, space_arg, include_archived=False, allow_empty=False):
-    """Resolve --space to every list ID in that space for search scoping."""
+    """Expand a space to every list ID it owns for search scoping.
+
+    This includes folderless lists plus lists nested under each folder so
+    `tasks search --space ...` behaves like a whole-space search. Returned IDs
+    are de-duplicated in discovery order because folder traversals can surface
+    overlapping list references.
+
+    `include_archived=True` forwards `archived=true` through the folderless,
+    folder, and per-folder list lookups so callers can build archived-only scope
+    expansions. When no lists are found, `allow_empty=True` returns `[]` so the
+    caller can decide whether to skip a pass; otherwise this raises the standard
+    "no lists available" CLI error.
+    """
     space_id = resolve_space_id(space_arg, spaces=client.runtime.spaces)
     params = {"archived": "true"} if include_archived else None
 
@@ -107,7 +119,11 @@ def _resolve_scope_list_ids(client, space_arg, include_archived=False, allow_emp
 
 
 def _paginate_tasks(client, path, params, budget=None):
-    """Fetch task pages from a paginated v2 endpoint with an optional budget."""
+    """Fetch paginated task results until exhaustion or the shared page budget.
+
+    The optional mutable `budget` lets callers cap multiple related scans, such
+    as active plus archived passes, under one bounded default.
+    """
     all_tasks = []
     page = 0
     pages_fetched = 0

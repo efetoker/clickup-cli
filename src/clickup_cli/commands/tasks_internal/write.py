@@ -10,6 +10,11 @@ from .shared import (
 
 
 def cmd_tasks_create(client, args):
+    """Create a task in the resolved target list.
+
+    When only `--list` is provided, infer `--space` so dry-run output and error
+    messages still report the same target context as normal runs.
+    """
     if not args.space and getattr(args, "list_id", None):
         inferred = _infer_space_from_list(client, args.list_id)
         if inferred:
@@ -58,6 +63,11 @@ def _parse_custom_field(raw):
 
 
 def cmd_tasks_update(client, args):
+    """Apply core field updates plus per-tag and per-custom-field mutations.
+
+    The ClickUp API splits these concerns across endpoints, so dry-run returns a
+    single execution plan even though live runs may make multiple requests.
+    """
     desc = read_content(args.desc, args.desc_file, "--desc")
 
     body = {}
@@ -127,7 +137,7 @@ def cmd_tasks_delete(client, args):
 
 
 def cmd_tasks_move(client, args):
-    """Move a task to a different list (v3 endpoint)."""
+    """Move a task by resolving `--to` as a space alias or raw list ID."""
     space = client.runtime.spaces.get(args.to_list)
     if space:
         list_id = space.get("list_id") or _first_folderless_list_id(client, space["space_id"])

@@ -95,6 +95,26 @@ def cmd_tasks_get(client, args):
 
 
 def cmd_tasks_search(client, args):
+    """Search tasks across workspace or scoped containers, then normalize output.
+
+    By default this shares the bounded pagination contract used by `tasks list`:
+    active and archived passes consume one shared page budget unless
+    `--all-pages` opts into an exhaustive scan, and the response advertises
+    completeness via `pages_fetched` / `results_complete` / `results_truncated`.
+
+    `--space` is expanded to every list in that space unless `--list` or
+    `--folder` already narrows the search. If the free-text query looks like a
+    task ID pattern (for example `PROJ-123`) and `--name-prefix` is omitted, the
+    same value is reused as a client-side `name_prefix` filter so broad ClickUp
+    search results collapse back to exact title prefixes.
+
+    Archived tasks require a second search pass because ClickUp treats
+    `archived=true` as archived-only. For space-scoped searches that means a
+    fallback archived list-ID expansion before the archived pass runs, while
+    empty active scopes can still stay valid when `--include-archived` is the
+    only source of matches. Tag filters are also applied client-side here, after
+    the API search results are merged.
+    """
     resolved_space_list_ids = None
     if args.space and not getattr(args, "list_id", None) and not getattr(args, "folder_id", None):
         resolved_space_list_ids = _resolve_scope_list_ids(

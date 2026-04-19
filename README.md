@@ -8,6 +8,16 @@ The missing ClickUp CLI. Built for developers and AI agents.
 
 There's no official ClickUp CLI. If you're a developer who lives in the terminal, or an AI agent that needs structured data from ClickUp, this fills the gap. JSON stdout, errors to stderr, dry-run on every mutation.
 
+## Documentation
+
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Integration Guide](INTEGRATION.md)
+- [Troubleshooting](TROUBLESHOOTING.md)
+- [Changelog](CHANGELOG.md)
+- [Release Guide](RELEASE.md)
+
 ## Install
 
 ```bash
@@ -52,6 +62,7 @@ This CLI is designed to be used by AI coding agents (Claude Code, Codex, etc.) a
 - `--pretty` for readable output during debugging
 - **Flag aliases for all positional args** — agents can use `--task-id`, `--query`, `--doc-id`, `--comment-id` etc. instead of positional arguments (both forms work)
 - **Auto-infer `--space` from `--list`** — `tasks create --list 12345 --name "Fix bug"` works without `--space`
+- **Bounded defaults with completeness metadata** — `tasks list` and `tasks search` bound pagination by default, and `tasks get` bounds comment hydration by default; each response includes metadata showing whether the result is complete or truncated
 
 **Plug-and-play skill file:** Copy `.claude/skills/clickup-cli.md` from this repo into your project's `.claude/skills/` directory. It teaches Claude Code how to use the CLI: command discovery, safety patterns, common workflows.
 
@@ -103,8 +114,9 @@ clickup tasks list --space <name> --pretty
 - **`tasks update`** handles core fields, assignee diffs (`--add-assignee` / `--remove-assignee`), tag diffs (`--add-tag` / `--remove-tag`), and custom fields (`--custom-field FIELD_ID=VALUE`) in one call. All flags are repeatable; `--dry-run` returns a structured plan.
 - **`tasks depend`** — `add`, `remove`, and `list` for task dependencies. Direction required on add/remove via `--depends-on` or `--depended-on-by`.
 - **`tasks list` / `tasks search --include-archived`** — second paginated call with `archived=true`, merged into the default results. Since ClickUp's `archived` param is a filter, this is the only way to see both in one command.
-- **`tasks list --full`** returns `status` as a consistent dict shape (`{status, color, type, orderindex}`). Compact mode and `--fields` continue returning a flat string — one contract per output mode.
-- **`tasks get`** auto-fetches comments and appends them to the output. Use `--no-comments` to skip.
+- **`tasks list` / `tasks search` bounded defaults** — by default, these commands fetch a bounded aggregate scan and return `pages_fetched`, `results_complete`, and `results_truncated`. Use `--all-pages` for an exhaustive scan.
+- **`tasks list --full` / `tasks search --full`** return full task objects with a normalized `status` dict shape (`{status, color, type, orderindex}`), not just the compact projection.
+- **`tasks get`** auto-fetches comments and appends them to the output. By default this is a bounded slice and the response includes `comment_count_returned`, `comments_complete`, and `comments_truncated`. Use `--all-comments` for exhaustive comment hydration or `--no-comments` to skip it.
 - **`tasks search`** auto-detects task ID patterns like `PROJ-39` and applies prefix filtering.
 - **`docs edit-page --append`** reads the current page content, appends your new content, and sends one update.
 - **Tag names** are auto-lowercased (ClickUp API stores them lowercase regardless of UI display).
@@ -128,7 +140,7 @@ clickup tasks list --space <name> --pretty
 }
 ```
 
-`space_id` is the identity of a configured alias. `list_id` is optional convenience for commands that need a default list; space-scoped commands should still target the full space. Reverting Phase 3 restores the older eager list caching setup and example shape.
+`space_id` is the identity of a configured alias. `list_id` is optional convenience for commands that need a default list; space-scoped commands still target the full space when the command supports full-space scope.
 
 ### Config resolution order
 
@@ -153,17 +165,15 @@ You can run without a config file by setting just `CLICKUP_API_TOKEN` — the wo
 
 **Not yet covered:** checklists, time tracking, attachments, goals, webhooks, automations.
 
-## Development Tools
+## Contributor Notes
 
-This repo includes automations for contributors using [Claude Code](https://claude.com/claude-code):
+Contributor setup stays intentionally standard:
 
-- **Auto-lint hook** — ruff check + format runs on every Python file edit
-- **Sensitive file guard** — blocks accidental edits to `.env`, `.key`, `.pem`, and credentials files
-- **context7 MCP** — live ClickUp API docs available during development (via `.mcp.json`)
-- **Skills** — `/release` workflow, `add-command` step-by-step guide, `clickup-cli` usage reference
-- **Subagents** — `test-writer` generates pytest tests following project patterns
+- `pip install -e ".[dev]"`
+- `pytest -v`
+- `ruff check src/ tests/`
 
-These are configured in `.claude/` and `.mcp.json`. Non-Claude-Code contributors can ignore them.
+Project-specific maintainer automation and agent tooling live in repo-local config files and are documented in [CONTRIBUTING.md](CONTRIBUTING.md), so the main README can stay focused on public CLI usage.
 
 ## Contributing
 
@@ -173,6 +183,8 @@ cd clickup-cli
 pip install -e ".[dev]"
 pytest -v
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the current manifest-driven command workflow, test layout, and maintainer notes. Public integration and support docs are linked in the [Documentation](#documentation) section above.
 
 Issues and PRs welcome at [github.com/efetoker/clickup-cli](https://github.com/efetoker/clickup-cli).
 
