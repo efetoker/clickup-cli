@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.0 (2026-04-20)
+
+- **Metadata discovery and custom-field lookup are easier to drive from the CLI.** New discovery flows cover field and task-type metadata, and task search can now target custom fields directly instead of forcing clients to pre-resolve everything out of band.
+- **Task creation and task membership operations now match more of ClickUp's native surface area.** `tasks create` gained richer payload parity, task link operations are exposed directly, and multi-list task flows support adding and removing list memberships without leaving the CLI.
+- **Space management reached CRUD parity.** Spaces now support the same create, read, update, and delete coverage already available on other container types, keeping workspace-level automation inside one tool.
+- **Docs and help text were refreshed for agent-first discoverability.** Command help and supporting documentation were tightened so `--help` remains enough to discover the newer workflows without external context.
+
 ## 1.6.0 (2026-04-18)
 
 - **Space-scoped task search and docs filtering now match the requested scope.** `tasks search --space <alias-or-id>` expands to every list in the resolved space, preserves explicit `--list` / `--folder` overrides, handles archived-only and empty-space edge cases without widening scope, and keeps the existing dry-run envelope intact. `docs list` and `docs create` now resolve `--space` through the shared alias-or-raw-ID path and fail fast on bad non-numeric space names.
