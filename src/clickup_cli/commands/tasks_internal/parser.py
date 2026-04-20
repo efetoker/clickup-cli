@@ -8,7 +8,7 @@ def register_parser(subparsers, F):
     tasks_parser = subparsers.add_parser(
         "tasks",
         formatter_class=F,
-        help="Full task CRUD: list, get, create, update, search, delete, move, merge",
+        help="Full task CRUD: list, get, create, update, search, delete, move, merge, lists, add-to-list, remove-from-list, link, depend",
         description="""\
 Manage ClickUp tasks — full CRUD plus search, move, merge, links, and dependencies.
 

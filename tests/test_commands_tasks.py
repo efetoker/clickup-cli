@@ -802,6 +802,18 @@ class TasksSearchBehaviorTests(unittest.TestCase):
         self.assertIn("search the whole space", help_text)
         self.assertIn("--custom-field", help_text)
 
+    def test_root_help_lists_recent_task_subcommands(self):
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="group")
+        register_tasks_parser(subparsers, argparse.RawDescriptionHelpFormatter)
+
+        help_text = parser.format_help()
+
+        self.assertIn("add-to-list", help_text)
+        self.assertIn("remove-from-list", help_text)
+        self.assertIn("link", help_text)
+        self.assertIn("depend", help_text)
+
     def test_list_scoping(self):
         client = FlexClient(responses={
             "/task": {"tasks": [], "last_page": True}

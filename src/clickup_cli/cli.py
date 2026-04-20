@@ -59,13 +59,13 @@ examples:
   clickup docs pages doc_abc123
 
 current coverage:
-  tasks     — list, get, create, update, search, delete, move, merge
+  tasks     — list, get, create, update, search, delete, move, merge, lists, add-to-list, remove-from-list, depend, link
   comments  — list, add, update, delete, thread, reply
   docs      — list, get, create, pages, get-page, edit-page, create-page
   fields    — list
   folders   — list, get, create, update, delete, privacy
   lists     — list, get, create, update, delete, privacy
-  spaces    — list, get, statuses, privacy
+  spaces    — list, get, create, update, delete, statuses, privacy
   team      — whoami, members
   tags      — list, add, remove
   task-types — list

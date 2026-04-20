@@ -79,14 +79,16 @@ Output is JSON on stdout; errors go to stderr.
 | Group | Subcommands | Description |
 |-------|-------------|-------------|
 | `init` | — | Interactive workspace setup |
-| `tasks` | list, get, create, update, search, delete, move, merge, depend | Full task CRUD + dependencies |
+| `tasks` | list, get, create, update, search, delete, move, merge, lists, add-to-list, remove-from-list, depend, link | Full task CRUD + memberships, links, and dependencies |
 | `comments` | list, add, update, delete, thread, reply | Full comment CRUD with threading |
 | `docs` | list, get, create, pages, get-page, edit-page, create-page | Docs and page management |
+| `fields` | list | Custom field discovery for list or space scope |
 | `folders` | list, get, create, update, delete, privacy | Folder CRUD + privacy toggle |
 | `lists` | list, get, create, update, delete, privacy | List CRUD + privacy toggle |
-| `spaces` | list, get, statuses, privacy | Space inspection + privacy toggle |
+| `spaces` | list, get, create, update, delete, statuses, privacy | Full space CRUD + statuses + privacy toggle |
 | `team` | whoami, members | Workspace and member info |
 | `tags` | list, add, remove | Tag management |
+| `task-types` | list | Workspace custom task type discovery |
 
 Use `clickup <group> <command> --help` for detailed usage, examples, and return format.
 
@@ -110,9 +112,12 @@ clickup tasks list --space <name> --pretty
 
 - **Flag aliases** — every positional argument also accepts a `--flag` form. `tasks get abc123` and `tasks get --task-id abc123` are equivalent. Same for `--query`, `--doc-id`, `--page-id`, `--folder-id`, `--list-id`, `--comment-id`, `--space`.
 - **Raw numeric IDs** on `--space` and `--folder` flags are accepted transparently alongside config aliases. On tasks commands, list-bound commands may resolve a raw space ID to its first folderless list via one API call.
-- **`tasks create`** auto-infers `--space` from `--list` via API lookup. You can omit `--space` if `--list` is provided.
+- **`tasks create`** auto-infers `--space` from `--list` via API lookup. You can omit `--space` if `--list` is provided, and create also supports start/due dates, time estimates, points, repeatable `--custom-field` values, and `--task-type`.
 - **`tasks update`** handles core fields, assignee diffs (`--add-assignee` / `--remove-assignee`), tag diffs (`--add-tag` / `--remove-tag`), and custom fields (`--custom-field FIELD_ID=VALUE`) in one call. All flags are repeatable; `--dry-run` returns a structured plan.
+- **`tasks lists` / `tasks add-to-list` / `tasks remove-from-list`** let you inspect and manage multi-list task membership separately from home-list moves.
+- **`tasks link`** manages non-blocking linked-task relationships; use `tasks depend` for blocking dependencies.
 - **`tasks depend`** — `add`, `remove`, and `list` for task dependencies. Direction required on add/remove via `--depends-on` or `--depended-on-by`.
+- **`fields list` / `task-types list`** expose custom field metadata and workspace custom item types for search/create flows.
 - **`tasks list` / `tasks search --include-archived`** — second paginated call with `archived=true`, merged into the default results. Since ClickUp's `archived` param is a filter, this is the only way to see both in one command.
 - **`tasks list` / `tasks search` bounded defaults** — by default, these commands fetch a bounded aggregate scan and return `pages_fetched`, `results_complete`, and `results_truncated`. Use `--all-pages` for an exhaustive scan.
 - **`tasks list --full` / `tasks search --full`** return full task objects with a normalized `status` dict shape (`{status, color, type, orderindex}`), not just the compact projection.
@@ -161,7 +166,7 @@ You can run without a config file by setting just `CLICKUP_API_TOKEN` — the wo
 
 ## Coverage and Gaps
 
-**Covered:** tasks (including dependencies and custom field writes), comments, docs/pages, folders, lists, spaces, tags, team/workspace info.
+**Covered:** tasks (including multi-list membership, links, dependencies, custom field writes, and task-type-aware create flows), comments, docs/pages, custom field discovery, folders, lists, spaces, tags, task type discovery, team/workspace info.
 
 **Not yet covered:** checklists, time tracking, attachments, goals, webhooks, automations.
 
