@@ -26,7 +26,8 @@ Tasks live in lists. Each space has a default list, but you can also
 target a specific list (e.g. one inside a folder) using --list <id>.
 Use 'folders list' and 'lists list' to discover list IDs.
 
-Does not cover: checklists, custom fields, time tracking, or attachments.""",
+Does not cover: checklists, time tracking, or attachments. Use `tasks search --custom-field`
+for custom-field filtering and Phase 10+ flows for custom-field mutation on create.""",
         epilog="""\
 examples:
   clickup tasks list --space <name>
@@ -390,6 +391,7 @@ examples:
   clickup tasks search "deploy" --include-closed --full
   clickup tasks search "bug" --fields id,name,url
   clickup tasks search "bug" --list 12345
+  clickup tasks search "bug" --custom-field abc123=high
 
 notes:
   Output is compact by default (id, name, status, priority, url).
@@ -398,6 +400,7 @@ notes:
   Queries matching the pattern ABC-123 auto-apply --name-prefix.
   Use --space, --list, or --folder to scope results.
   Use `--space` to search the whole space across every list it owns.
+  --custom-field applies equality filters as FIELD_ID=VALUE and is repeatable.
   --name-prefix filters the returned tasks client-side by task name prefix.
   The search API has a default page size — this CLI handles pagination
   automatically and returns all matching results.""",
@@ -428,6 +431,14 @@ notes:
         type=str,
         dest="folder_id",
         help="Scope search to a specific folder ID (ClickUp calls this project_ids)",
+    )
+    ts.add_argument(
+        "--custom-field",
+        type=str,
+        action="append",
+        dest="custom_fields",
+        metavar="FIELD_ID=VALUE",
+        help="Filter by a custom field equality match (repeatable)",
     )
     ts.add_argument(
         "--name-prefix",

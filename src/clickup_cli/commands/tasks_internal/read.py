@@ -12,6 +12,7 @@ from .shared import (
     _filter_by_tags,
     _format_and_wrap,
     _paginate_tasks,
+    _parse_search_custom_fields,
     _resolve_list_id,
     _resolve_scope_list_ids,
 )
@@ -133,6 +134,9 @@ def cmd_tasks_search(client, args):
     params = {"search": args.query}
     if args.include_closed:
         params["include_closed"] = "true"
+    custom_fields = _parse_search_custom_fields(getattr(args, "custom_fields", None))
+    if custom_fields:
+        params["custom_fields"] = custom_fields
     run_active_search = True
     if hasattr(args, "list_id") and args.list_id:
         params["list_ids[]"] = args.list_id

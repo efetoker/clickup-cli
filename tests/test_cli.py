@@ -104,6 +104,36 @@ class CliArgumentTests(unittest.TestCase):
         self.assertEqual(args.group, "init")
         self.assertEqual(args.token, "pk_test123")
 
+    def test_parser_registers_metadata_groups(self):
+        parser = cli.build_parser()
+
+        fields_args = parser.parse_args(["fields", "list", "--space", "staging"])
+        task_types_args = parser.parse_args(["task-types", "list", "--list", "12345"])
+
+        self.assertEqual(fields_args.group, "fields")
+        self.assertEqual(fields_args.command, "list")
+        self.assertEqual(fields_args.space, "staging")
+        self.assertEqual(task_types_args.group, "task-types")
+        self.assertEqual(task_types_args.command, "list")
+        self.assertEqual(task_types_args.list_id, "12345")
+
+    def test_tasks_search_parser_accepts_repeatable_custom_field_filters(self):
+        parser = cli.build_parser()
+
+        args = parser.parse_args(
+            [
+                "tasks",
+                "search",
+                "bug",
+                "--custom-field",
+                "field-1=high",
+                "--custom-field",
+                "field-2=42",
+            ]
+        )
+
+        self.assertEqual(args.custom_fields, ["field-1=high", "field-2=42"])
+
 
 class TaskSearchTests(unittest.TestCase):
     def test_tasks_search_name_prefix_filters_broad_matches(self):

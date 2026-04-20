@@ -118,6 +118,20 @@ def _resolve_scope_list_ids(client, space_arg, include_archived=False, allow_emp
     return list_ids
 
 
+def _parse_search_custom_fields(raw_filters):
+    """Parse repeatable FIELD_ID=VALUE search filters for the ClickUp API."""
+    parsed = []
+    for raw_filter in raw_filters or []:
+        field_id, separator, value = raw_filter.partition("=")
+        if not separator or not field_id or value == "":
+            error(
+                "Invalid --custom-field value: "
+                f"{raw_filter}. Use FIELD_ID=VALUE"
+            )
+        parsed.append({"field_id": field_id, "operator": "=", "value": value})
+    return parsed
+
+
 def _paginate_tasks(client, path, params, budget=None):
     """Fetch paginated task results until exhaustion or the shared page budget.
 

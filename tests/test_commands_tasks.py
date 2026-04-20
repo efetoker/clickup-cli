@@ -429,6 +429,7 @@ class TasksSearchBehaviorTests(unittest.TestCase):
             folder_id=None,
             name_prefix=None,
             tags=None,
+            custom_fields=None,
             fields=None,
             full=False,
         )
@@ -571,6 +572,60 @@ class TasksSearchBehaviorTests(unittest.TestCase):
             {"dry_run": True, "action": "search_tasks", "query": "bug"},
         )
 
+    def test_search_accepts_repeatable_custom_field_filters(self):
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="group")
+        register_tasks_parser(subparsers, argparse.RawDescriptionHelpFormatter)
+        tasks_parser = subparsers.choices["tasks"]
+
+        args = tasks_parser.parse_args(
+            [
+                "search",
+                "bug",
+                "--custom-field",
+                "field-1=high",
+                "--custom-field",
+                "field-2=42",
+            ]
+        )
+
+        self.assertEqual(args.custom_fields, ["field-1=high", "field-2=42"])
+
+    def test_search_serializes_custom_field_filters_for_active_and_archived_passes(self):
+        client = FlexClient(
+            responses={
+                "/task": [
+                    {"tasks": [], "last_page": True},
+                    {"tasks": [], "last_page": True},
+                ]
+            }
+        )
+
+        cmd_tasks_search(
+            client,
+            self._make_search_args(
+                include_archived=True,
+                custom_fields=["field-1=high", "field-2=42"],
+            ),
+        )
+
+        task_calls = [call for call in client.calls if call["path"].endswith("/task")]
+        self.assertEqual(
+            task_calls[0]["params"]["custom_fields"],
+            [
+                {"field_id": "field-1", "operator": "=", "value": "high"},
+                {"field_id": "field-2", "operator": "=", "value": "42"},
+            ],
+        )
+        self.assertEqual(task_calls[1]["params"]["custom_fields"], task_calls[0]["params"]["custom_fields"])
+        self.assertEqual(task_calls[1]["params"]["archived"], "true")
+
+    def test_search_invalid_custom_field_filter_errors(self):
+        client = FlexClient(responses={"/task": {"tasks": [], "last_page": True}})
+
+        with self.assertRaises(SystemExit):
+            cmd_tasks_search(client, self._make_search_args(custom_fields=["missing-separator"]))
+
     def test_search_help_describes_space_scope_as_whole_space(self):
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="group")
@@ -579,6 +634,7 @@ class TasksSearchBehaviorTests(unittest.TestCase):
         search_parser = tasks_parser._subparsers._group_actions[0].choices["search"]
         help_text = search_parser.format_help()
         self.assertIn("search the whole space", help_text)
+        self.assertIn("--custom-field", help_text)
 
     def test_list_scoping(self):
         client = FlexClient(responses={
@@ -1088,4 +1144,3 @@ class TasksIncludeArchivedTests(unittest.TestCase):
             call for call in client.calls if call["method"] == "GET" and call["path"].endswith("/task")
         ]
         self.assertEqual(task_calls, [])
-

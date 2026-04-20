@@ -35,9 +35,9 @@ def build_parser():
         prog="clickup",
         formatter_class=F,
         description="""\
-ClickUp CLI — manage tasks, comments, docs, folders, lists, spaces, and teams from the command line.
+ClickUp CLI — manage tasks, comments, docs, folders, lists, spaces, teams, and metadata from the command line.
 
-Covers eight command groups: tasks, comments, docs, folders, lists, spaces, team, and tags.
+Covers ten command groups: tasks, comments, docs, fields, folders, lists, spaces, team, tags, and task-types.
 All successful output is JSON printed to stdout.
 Errors are printed to stderr with a non-zero exit code.
 
@@ -53,6 +53,7 @@ examples:
   clickup tasks list --list 12345
   clickup --dry-run tasks create --space <name> --name "Fix login"
   clickup folders list --space <name>
+  clickup fields list --space <name>
   clickup lists list --folder 12345
   clickup comments list abc123
   clickup docs pages doc_abc123
@@ -61,11 +62,13 @@ current coverage:
   tasks     — list, get, create, update, search, delete, move, merge
   comments  — list, add, update, delete, thread, reply
   docs      — list, get, create, pages, get-page, edit-page, create-page
+  fields    — list
   folders   — list, get, create, update, delete, privacy
   lists     — list, get, create, update, delete, privacy
   spaces    — list, get, statuses, privacy
   team      — whoami, members
   tags      — list, add, remove
+  task-types — list
 
 Use <group> --help for details on each group.""",
     )

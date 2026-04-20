@@ -10,7 +10,18 @@ class CommandManifestTests(unittest.TestCase):
         groups = {manifest["group"] for manifest in COMMAND_MANIFESTS}
         self.assertEqual(
             groups,
-            {"tasks", "comments", "docs", "folders", "lists", "spaces", "tags", "team"},
+            {
+                "tasks",
+                "comments",
+                "docs",
+                "fields",
+                "folders",
+                "lists",
+                "spaces",
+                "tags",
+                "task-types",
+                "team",
+            },
         )
 
         for manifest in COMMAND_MANIFESTS:
@@ -32,6 +43,8 @@ class CommandManifestTests(unittest.TestCase):
         self.assertIn("docs_get-page", HANDLERS)
         self.assertIn("docs_edit-page", HANDLERS)
         self.assertIn("docs_create-page", HANDLERS)
+        self.assertIn("fields_list", HANDLERS)
+        self.assertIn("task-types_list", HANDLERS)
 
 
 if __name__ == "__main__":
