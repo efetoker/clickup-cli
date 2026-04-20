@@ -10,7 +10,7 @@ def register_parser(subparsers, F):
         formatter_class=F,
         help="Full task CRUD: list, get, create, update, search, delete, move, merge",
         description="""\
-Manage ClickUp tasks — full CRUD plus search, move, and merge.
+Manage ClickUp tasks — full CRUD plus search, move, merge, links, and dependencies.
 
 Subcommands:
   list    — list tasks in a list or space (paginated internally)
@@ -21,6 +21,11 @@ Subcommands:
   delete  — delete a task (destructive)
   move    — move a task to a different list/space (mutating, v3)
   merge   — merge source tasks into a target task (mutating)
+  lists   — inspect the lists a task belongs to
+  add-to-list        — add a task to an additional list (mutating)
+  remove-from-list   — remove a task from an additional list (mutating)
+  link    — manage linked-task relationships (mutating/read)
+  depend  — manage dependency relationships (mutating/read)
 
 Tasks live in lists. Each space has a default list, but you can also
 target a specific list (e.g. one inside a folder) using --list <id>.
@@ -594,6 +599,76 @@ examples:
         help="Comma-separated source task IDs to merge into the target",
     )
 
+    # tasks lists
+    ttl = tasks_sub.add_parser(
+        "lists",
+        formatter_class=F,
+        help="Inspect the lists a task belongs to",
+        description="""\
+Inspect the home list and additional list memberships for a task.
+
+This is distinct from `tasks move`: it reports membership only and does not
+change or imply a home-list move.
+
+Delegates to GET /task/{id} and returns an explicit home-list field plus the
+full list membership set for the task.""",
+        epilog="""\
+returns:
+  {"task_id": "...", "home_list": {...}, "lists": [...]}
+
+examples:
+  clickup tasks lists abc123
+  clickup tasks lists --task-id abc123""",
+    )
+    add_id_argument(ttl, "task_id", "ClickUp task ID")
+
+    # tasks add-to-list
+    ttal = tasks_sub.add_parser(
+        "add-to-list",
+        formatter_class=F,
+        help="Add a task to an additional list",
+        description="""\
+Add a task to an additional list without changing its home list.
+
+This is distinct from `tasks move`, which changes the home list. Use --dry-run
+to preview the exact membership action before calling the API.""",
+        epilog="""\
+examples:
+  clickup tasks add-to-list abc123 --list-id 901816700000
+  clickup --dry-run tasks add-to-list abc123 --list-id 901816700000""",
+    )
+    add_id_argument(ttal, "task_id", "ClickUp task ID")
+    ttal.add_argument(
+        "--list-id",
+        required=True,
+        dest="list_id",
+        help="Additional ClickUp list ID to add the task to",
+    )
+
+    # tasks remove-from-list
+    ttrfl = tasks_sub.add_parser(
+        "remove-from-list",
+        formatter_class=F,
+        help="Remove a task from an additional list",
+        description="""\
+Remove a task from an additional list without converting the operation into a
+home-list move.
+
+If ClickUp rejects the removal because the task cannot leave that list, the
+command surfaces that API failure instead of masking it.""",
+        epilog="""\
+examples:
+  clickup tasks remove-from-list abc123 --list-id 901816700000
+  clickup --dry-run tasks remove-from-list abc123 --list-id 901816700000""",
+    )
+    add_id_argument(ttrfl, "task_id", "ClickUp task ID")
+    ttrfl.add_argument(
+        "--list-id",
+        required=True,
+        dest="list_id",
+        help="Additional ClickUp list ID to remove the task from",
+    )
+
     # tasks depend — subcommand group for dependency CRUD
     tdp = tasks_sub.add_parser(
         "depend",
@@ -679,3 +754,71 @@ examples:
   clickup tasks depend list abc123""",
     )
     add_id_argument(tdpl, "task_id", "ClickUp task ID")
+
+    # tasks link - linked-task relationship CRUD
+    tlk = tasks_sub.add_parser(
+        "link",
+        formatter_class=F,
+        help="Manage linked-task relationships (add, remove, list)",
+        description="""\
+Manage ClickUp linked-task relationships. Links are distinct from dependencies:
+they associate tasks without introducing "blocked by" or "blocking" meaning.
+
+Subcommands:
+  add     — create a linked-task relationship
+  remove  — delete a linked-task relationship
+  list    — list this task's current linked-task relationships
+
+Under the hood these map to POST/DELETE /task/{id}/link/{linked_task_id}
+and the `linked_tasks` field returned by GET /task/{id}.""",
+        epilog="""\
+examples:
+  clickup tasks link add abc123 --linked-task def456
+  clickup tasks link remove abc123 --linked-task def456
+  clickup tasks link list abc123
+  clickup --dry-run tasks link add abc123 --linked-task def456""",
+    )
+    tlk_sub = tlk.add_subparsers(dest="subcommand", required=True)
+
+    for name, desc in (
+        ("add", "Create a linked-task relationship between two tasks"),
+        ("remove", "Delete a linked-task relationship between two tasks"),
+    ):
+        sp = tlk_sub.add_parser(
+            name,
+            formatter_class=F,
+            help=desc,
+            description=f"""\
+{desc}.
+
+This relationship is not a dependency. Use `tasks depend` for blocking flows.
+
+Use --dry-run to preview without calling the API.""",
+        )
+        add_id_argument(sp, "task_id", "Target ClickUp task ID")
+        sp.add_argument(
+            "--linked-task",
+            dest="linked_task_id",
+            required=True,
+            type=str,
+            metavar="OTHER_TASK_ID",
+            help="Other task to link or unlink",
+        )
+
+    tlkl = tlk_sub.add_parser(
+        "list",
+        formatter_class=F,
+        help="List a task's current linked-task relationships",
+        description="""\
+List the linked-task relationships on a task.
+
+Delegates to GET /task/{id} and returns only the `linked_tasks` data,
+separate from any dependency arrays or other task metadata.""",
+        epilog="""\
+returns:
+  {"task_id": "...", "linked_tasks": [...]}
+
+examples:
+  clickup tasks link list abc123""",
+    )
+    add_id_argument(tlkl, "task_id", "ClickUp task ID")

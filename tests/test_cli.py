@@ -134,6 +134,67 @@ class CliArgumentTests(unittest.TestCase):
 
         self.assertEqual(args.custom_fields, ["field-1=high", "field-2=42"])
 
+    def test_tasks_link_add_parser_accepts_flag_aliases(self):
+        parser = cli.build_parser()
+
+        args = parser.parse_args(
+            [
+                "tasks",
+                "link",
+                "add",
+                "--task-id",
+                "abc123",
+                "--linked-task",
+                "def456",
+            ]
+        )
+        resolve_id_args(args)
+
+        self.assertEqual(args.group, "tasks")
+        self.assertEqual(args.command, "link")
+        self.assertEqual(args.subcommand, "add")
+        self.assertEqual(args.task_id, "abc123")
+        self.assertEqual(args.linked_task_id, "def456")
+
+    def test_tasks_link_list_parser_accepts_positional_task_id(self):
+        parser = cli.build_parser()
+
+        args = parser.parse_args(["tasks", "link", "list", "abc123"])
+
+        self.assertEqual(args.task_id, "abc123")
+
+    def test_tasks_lists_parser_accepts_task_id_flag_alias(self):
+        parser = cli.build_parser()
+
+        args = parser.parse_args(["tasks", "lists", "--task-id", "abc123"])
+        resolve_id_args(args)
+
+        self.assertEqual(args.command, "lists")
+        self.assertEqual(args.task_id, "abc123")
+
+    def test_tasks_add_to_list_parser_accepts_required_list_id(self):
+        parser = cli.build_parser()
+
+        args = parser.parse_args(
+            [
+                "tasks",
+                "add-to-list",
+                "abc123",
+                "--list-id",
+                "901816700000",
+            ]
+        )
+
+        self.assertEqual(args.command, "add-to-list")
+        self.assertEqual(args.task_id, "abc123")
+        self.assertEqual(args.list_id, "901816700000")
+
+    def test_tasks_remove_from_list_parser_requires_list_id(self):
+        parser = cli.build_parser()
+
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["tasks", "remove-from-list", "abc123"])
+
 
 class TaskSearchTests(unittest.TestCase):
     def test_tasks_search_name_prefix_filters_broad_matches(self):

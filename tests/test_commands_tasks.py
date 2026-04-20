@@ -10,12 +10,16 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from clickup_cli.commands.tasks import (
+    cmd_tasks_add_to_list,
     cmd_tasks_create,
     cmd_tasks_depend,
     cmd_tasks_get,
+    cmd_tasks_link,
     cmd_tasks_list,
+    cmd_tasks_lists,
     cmd_tasks_merge,
     cmd_tasks_move,
+    cmd_tasks_remove_from_list,
     cmd_tasks_search,
     cmd_tasks_update,
     register_parser as register_tasks_parser,
@@ -930,6 +934,151 @@ class TasksDependTests(unittest.TestCase):
         # depended_on_by = who is waiting on this task
         self.assertEqual(len(result["depended_on_by"]), 1)
         self.assertEqual(result["depended_on_by"][0]["task_id"], "blocked1")
+
+
+class TasksLinkTests(unittest.TestCase):
+    """Coverage for `tasks link add/remove/list`."""
+
+    def _args(self, subcommand, **overrides):
+        defaults = dict(
+            subcommand=subcommand,
+            task_id="abc123",
+            linked_task_id=None,
+        )
+        defaults.update(overrides)
+        return Namespace(**defaults)
+
+    def test_add_posts_to_link_endpoint(self):
+        client = FlexClient(responses={"/task/abc123/link/def456": {}})
+        cmd_tasks_link(client, self._args("add", linked_task_id="def456"))
+        post_call = next(c for c in client.calls if c["method"] == "POST")
+        self.assertEqual(post_call["path"], "/task/abc123/link/def456")
+        self.assertEqual(post_call["data"], {})
+
+    def test_remove_deletes_link_endpoint(self):
+        client = FlexClient(responses={"/task/abc123/link/def456": {}})
+        cmd_tasks_link(client, self._args("remove", linked_task_id="def456"))
+        delete_call = next(c for c in client.calls if c["method"] == "DELETE")
+        self.assertEqual(delete_call["path"], "/task/abc123/link/def456")
+        self.assertIsNone(delete_call["params"])
+
+    def test_dry_run_add_uses_link_specific_fields(self):
+        client = FlexClient(dry_run=True)
+        result = cmd_tasks_link(client, self._args("add", linked_task_id="def456"))
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["action"], "link_add")
+        self.assertEqual(result["task_id"], "abc123")
+        self.assertEqual(result["linked_task_id"], "def456")
+        self.assertEqual(client.calls, [])
+
+    def test_add_requires_linked_task_id(self):
+        client = FlexClient()
+        with self.assertRaises(SystemExit):
+            cmd_tasks_link(client, self._args("add"))
+
+    def test_list_returns_only_link_data(self):
+        client = FlexClient(
+            responses={
+                "/task/abc123": {
+                    "id": "abc123",
+                    "linked_tasks": [
+                        {"task_id": "abc123", "link_id": "def456"},
+                        {"task_id": "abc123", "link_id": "ghi789"},
+                    ],
+                    "dependencies": [
+                        {"task_id": "abc123", "depends_on": "blocker1"},
+                    ],
+                }
+            }
+        )
+
+        result = cmd_tasks_link(client, self._args("list"))
+
+        self.assertEqual(result, {
+            "task_id": "abc123",
+            "linked_tasks": [
+                {"task_id": "abc123", "link_id": "def456"},
+                {"task_id": "abc123", "link_id": "ghi789"},
+            ],
+        })
+        self.assertNotIn("dependencies", result)
+
+
+class TasksMultiListTests(unittest.TestCase):
+    """Coverage for task-scoped multi-list commands."""
+
+    def _membership_args(self, **overrides):
+        defaults = dict(task_id="abc123", list_id="901816700000")
+        defaults.update(overrides)
+        return Namespace(**defaults)
+
+    def test_lists_returns_home_and_additional_lists(self):
+        client = FlexClient(
+            responses={
+                "/task/abc123": {
+                    "id": "abc123",
+                    "list": {"id": "home-1", "name": "Home"},
+                    "additional_lists": [
+                        {"id": "extra-1", "name": "Extra 1"},
+                        {"id": "extra-2", "name": "Extra 2"},
+                    ],
+                }
+            }
+        )
+
+        result = cmd_tasks_lists(client, Namespace(task_id="abc123"))
+
+        self.assertEqual(
+            result,
+            {
+                "task_id": "abc123",
+                "home_list": {"id": "home-1", "name": "Home"},
+                "lists": [
+                    {"id": "home-1", "name": "Home"},
+                    {"id": "extra-1", "name": "Extra 1"},
+                    {"id": "extra-2", "name": "Extra 2"},
+                ],
+            },
+        )
+
+    def test_add_to_list_posts_to_list_task_endpoint(self):
+        client = FlexClient(responses={"/list/901816700000/task/abc123": {}})
+
+        cmd_tasks_add_to_list(client, self._membership_args())
+
+        post_call = next(c for c in client.calls if c["method"] == "POST")
+        self.assertEqual(post_call["path"], "/list/901816700000/task/abc123")
+        self.assertEqual(post_call["data"], {})
+
+    def test_remove_from_list_deletes_list_task_endpoint(self):
+        client = FlexClient(responses={"/list/901816700000/task/abc123": {}})
+
+        cmd_tasks_remove_from_list(client, self._membership_args())
+
+        delete_call = next(c for c in client.calls if c["method"] == "DELETE")
+        self.assertEqual(delete_call["path"], "/list/901816700000/task/abc123")
+
+    def test_add_to_list_dry_run_uses_membership_action(self):
+        client = FlexClient(dry_run=True)
+
+        result = cmd_tasks_add_to_list(client, self._membership_args())
+
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["action"], "add_to_list")
+        self.assertEqual(result["task_id"], "abc123")
+        self.assertEqual(result["list_id"], "901816700000")
+        self.assertEqual(client.calls, [])
+
+    def test_remove_from_list_surfaces_delete_failures_without_move_fallback(self):
+        client = MagicMock()
+        client.dry_run = False
+        client.delete_v2.side_effect = RuntimeError("cannot remove home list")
+        client.put_v3 = MagicMock()
+
+        with self.assertRaises(RuntimeError):
+            cmd_tasks_remove_from_list(client, self._membership_args())
+
+        client.put_v3.assert_not_called()
 
 
 class RawIdFlagAcceptanceTests(unittest.TestCase):

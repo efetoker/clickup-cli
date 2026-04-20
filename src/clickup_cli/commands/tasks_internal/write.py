@@ -268,6 +268,69 @@ def cmd_tasks_move(client, args):
     )
 
 
+def cmd_tasks_lists(client, args):
+    """Return the home list plus any additional list memberships for a task."""
+    task = client.get_v2(f"/task/{args.task_id}")
+    home_list = task.get("list") or {}
+    additional_lists = task.get("additional_lists", []) or []
+
+    lists = []
+    if home_list:
+        lists.append(home_list)
+    lists.extend(additional_lists)
+
+    return {
+        "task_id": args.task_id,
+        "home_list": home_list,
+        "lists": lists,
+    }
+
+
+def _require_membership_list_id(args):
+    list_id = getattr(args, "list_id", None)
+    if list_id:
+        return list_id
+    error("Provide --list-id <list_id>")
+
+
+def cmd_tasks_add_to_list(client, args):
+    """Add a task to an additional list without changing its home list."""
+    list_id = _require_membership_list_id(args)
+    if client.dry_run:
+        return {
+            "dry_run": True,
+            "action": "add_to_list",
+            "task_id": args.task_id,
+            "list_id": list_id,
+        }
+    client.post_v2(f"/list/{list_id}/task/{args.task_id}", data={})
+    return {
+        "status": "ok",
+        "action": "added_to_list",
+        "task_id": args.task_id,
+        "list_id": list_id,
+    }
+
+
+def cmd_tasks_remove_from_list(client, args):
+    """Remove a task from an additional list and let API failures surface."""
+    list_id = _require_membership_list_id(args)
+    if client.dry_run:
+        return {
+            "dry_run": True,
+            "action": "remove_from_list",
+            "task_id": args.task_id,
+            "list_id": list_id,
+        }
+    client.delete_v2(f"/list/{list_id}/task/{args.task_id}")
+    return {
+        "status": "ok",
+        "action": "removed_from_list",
+        "task_id": args.task_id,
+        "list_id": list_id,
+    }
+
+
 def cmd_tasks_depend(client, args):
     """Dispatch `tasks depend {add,remove,list}` subcommands."""
     subcommand = getattr(args, "subcommand", None)
@@ -278,6 +341,18 @@ def cmd_tasks_depend(client, args):
     if subcommand == "list":
         return _tasks_depend_list(client, args)
     error(f"Unknown tasks depend subcommand: {subcommand}")
+
+
+def cmd_tasks_link(client, args):
+    """Dispatch `tasks link {add,remove,list}` subcommands."""
+    subcommand = getattr(args, "subcommand", None)
+    if subcommand == "add":
+        return _tasks_link_add(client, args)
+    if subcommand == "remove":
+        return _tasks_link_remove(client, args)
+    if subcommand == "list":
+        return _tasks_link_list(client, args)
+    error(f"Unknown tasks link subcommand: {subcommand}")
 
 
 def _depend_body(args):
@@ -314,6 +389,57 @@ def _tasks_depend_list(client, args):
         "task_id": args.task_id,
         "depends_on": depends_on,
         "depended_on_by": depended_on_by,
+    }
+
+
+def _linked_task_id(args):
+    linked_task_id = getattr(args, "linked_task_id", None)
+    if linked_task_id:
+        return linked_task_id
+    error("Provide --linked-task <task_id>")
+
+
+def _tasks_link_add(client, args):
+    linked_task_id = _linked_task_id(args)
+    if client.dry_run:
+        return {
+            "dry_run": True,
+            "action": "link_add",
+            "task_id": args.task_id,
+            "linked_task_id": linked_task_id,
+        }
+    client.post_v2(f"/task/{args.task_id}/link/{linked_task_id}", data={})
+    return {
+        "status": "ok",
+        "action": "link_added",
+        "task_id": args.task_id,
+        "linked_task_id": linked_task_id,
+    }
+
+
+def _tasks_link_remove(client, args):
+    linked_task_id = _linked_task_id(args)
+    if client.dry_run:
+        return {
+            "dry_run": True,
+            "action": "link_remove",
+            "task_id": args.task_id,
+            "linked_task_id": linked_task_id,
+        }
+    client.delete_v2(f"/task/{args.task_id}/link/{linked_task_id}")
+    return {
+        "status": "ok",
+        "action": "link_removed",
+        "task_id": args.task_id,
+        "linked_task_id": linked_task_id,
+    }
+
+
+def _tasks_link_list(client, args):
+    task = client.get_v2(f"/task/{args.task_id}")
+    return {
+        "task_id": args.task_id,
+        "linked_tasks": task.get("linked_tasks", []) or [],
     }
 
 
