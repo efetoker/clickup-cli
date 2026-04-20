@@ -334,10 +334,50 @@ class TasksCreateBehaviorTests(unittest.TestCase):
 
     def _make_args(self, **overrides):
         defaults = dict(space="testspace", list_id=None, name="Task",
-                        desc=None, desc_file=None,
-                        priority=None, status=None, assign_user=None)
+                         desc=None, desc_file=None,
+                         priority=None, status=None, assign_user=None,
+                         start_date=None, due_date=None,
+                         time_estimate=None, points=None,
+                         custom_fields=None, task_type=None)
         defaults.update(overrides)
         return Namespace(**defaults)
+
+    def test_create_parser_accepts_richer_phase_ten_flags(self):
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="group")
+        register_tasks_parser(subparsers, argparse.RawDescriptionHelpFormatter)
+        tasks_parser = subparsers.choices["tasks"]
+
+        args = tasks_parser.parse_args(
+            [
+                "create",
+                "--space",
+                "testspace",
+                "--name",
+                "Task",
+                "--start-date",
+                "2026-04-21",
+                "--due-date",
+                "2026-04-24",
+                "--time-estimate",
+                "90m",
+                "--points",
+                "3",
+                "--custom-field",
+                "field-1=high",
+                "--custom-field",
+                "field-2=42",
+                "--task-type",
+                "type-1",
+            ]
+        )
+
+        self.assertEqual(args.start_date, "2026-04-21")
+        self.assertEqual(args.due_date, "2026-04-24")
+        self.assertEqual(args.time_estimate, "90m")
+        self.assertEqual(args.points, "3")
+        self.assertEqual(args.custom_fields, ["field-1=high", "field-2=42"])
+        self.assertEqual(args.task_type, "type-1")
 
     def test_no_priority_when_unset(self):
         client = FlexClient(dry_run=True)
@@ -368,6 +408,128 @@ class TasksCreateBehaviorTests(unittest.TestCase):
         args = self._make_args(status="in progress")
         result = cmd_tasks_create(client, args)
         self.assertEqual(result["body"]["status"], "in progress")
+
+    def test_richer_core_fields_appear_in_dry_run_body(self):
+        client = FlexClient(dry_run=True)
+        args = self._make_args(
+            start_date="2026-04-21",
+            due_date="2026-04-24",
+            time_estimate="90m",
+            points="3",
+        )
+        result = cmd_tasks_create(client, args)
+
+        self.assertEqual(result["body"]["start_date"], "1776729600000")
+        self.assertEqual(result["body"]["due_date"], "1776988800000")
+        self.assertTrue(result["body"]["start_date_time"])
+        self.assertTrue(result["body"]["due_date_time"])
+        self.assertEqual(result["body"]["time_estimate"], 5400000)
+        self.assertEqual(result["body"]["points"], 3)
+
+    def test_create_custom_fields_dry_run_shows_post_create_plan(self):
+        client = FlexClient(dry_run=True)
+        result = cmd_tasks_create(
+            client,
+            self._make_args(custom_fields=["field-1=high", "field-2=42"]),
+        )
+
+        self.assertEqual(result["action"], "create_task")
+        self.assertEqual(result["create_body"]["name"], "Task")
+        self.assertEqual(
+            result["post_create_custom_fields"],
+            [
+                {"field_id": "field-1", "value": "high"},
+                {"field_id": "field-2", "value": "42"},
+            ],
+        )
+        self.assertEqual(client.calls, [])
+
+    def test_create_custom_fields_live_posts_follow_up_and_fetches_final_task(self):
+        client = FlexClient(
+            responses={
+                "/list/222/task": {"id": "task-1", "name": "Task"},
+                "/task/task-1": {"id": "task-1", "name": "Task", "custom_fields": []},
+            }
+        )
+
+        result = cmd_tasks_create(
+            client,
+            self._make_args(custom_fields=["field-1=high", "field-2=42"]),
+        )
+
+        self.assertEqual(result["id"], "task-1")
+        self.assertEqual(
+            [call["path"] for call in client.calls],
+            [
+                "/list/222/task",
+                "/task/task-1/field/field-1",
+                "/task/task-1/field/field-2",
+                "/task/task-1",
+            ],
+        )
+
+    def test_create_task_type_sets_supported_create_body_field(self):
+        client = FlexClient(
+            dry_run=True,
+            responses={
+                "/team/test_workspace/custom_item": {
+                    "custom_items": [{"id": "type-1", "name": "Bug"}]
+                }
+            },
+        )
+
+        result = cmd_tasks_create(client, self._make_args(task_type="type-1"))
+
+        self.assertEqual(result["task_type"], {"id": "type-1", "source": "workspace_custom_item_types"})
+        self.assertEqual(result["create_body"]["custom_item_id"], "type-1")
+
+    def test_create_task_type_errors_when_workspace_type_is_unknown(self):
+        client = FlexClient(
+            responses={"/team/test_workspace/custom_item": {"custom_items": []}}
+        )
+
+        with self.assertRaises(SystemExit):
+            cmd_tasks_create(client, self._make_args(task_type="missing-type"))
+
+    def test_create_rejects_bad_custom_field_format_before_api_calls(self):
+        client = FlexClient(dry_run=True)
+
+        with self.assertRaises(SystemExit):
+            cmd_tasks_create(client, self._make_args(custom_fields=["missing-separator"]))
+
+        self.assertEqual(client.calls, [])
+
+    def test_create_rejects_bad_start_date_before_api_calls(self):
+        client = FlexClient(dry_run=True)
+
+        with self.assertRaises(SystemExit):
+            cmd_tasks_create(client, self._make_args(start_date="04/21/2026"))
+
+        self.assertEqual(client.calls, [])
+
+    def test_create_rejects_bad_due_date_before_api_calls(self):
+        client = FlexClient(dry_run=True)
+
+        with self.assertRaises(SystemExit):
+            cmd_tasks_create(client, self._make_args(due_date="not-a-date"))
+
+        self.assertEqual(client.calls, [])
+
+    def test_create_rejects_bad_time_estimate_before_api_calls(self):
+        client = FlexClient(dry_run=True)
+
+        with self.assertRaises(SystemExit):
+            cmd_tasks_create(client, self._make_args(time_estimate="soon"))
+
+        self.assertEqual(client.calls, [])
+
+    def test_create_rejects_bad_points_before_api_calls(self):
+        client = FlexClient(dry_run=True)
+
+        with self.assertRaises(SystemExit):
+            cmd_tasks_create(client, self._make_args(points="three"))
+
+        self.assertEqual(client.calls, [])
 
     def test_no_tags_by_default(self):
         """tasks create must not inject any tags unless --tag is passed."""

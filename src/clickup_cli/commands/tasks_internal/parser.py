@@ -205,6 +205,10 @@ the CLI can infer --space automatically.
 Use --desc for inline text or --desc-file for file-based content.
 Do not use both at the same time.
 
+Phase 10 fields are supported directly on create: start/due dates,
+time estimate, points, repeatable --custom-field values, and explicit
+task/custom item type selection.
+
 Use --dry-run to preview the request body without creating the task.
 Global flags may appear before or after the command group:
   clickup --dry-run tasks create --space <name> --name "My task"
@@ -218,6 +222,9 @@ examples:
   clickup tasks create --space <name> --name "Fix bug" --desc "Details here"
   clickup tasks create --space <name> --list 12345 --name "In folder list"
   clickup tasks create --space <name> --name "Read article" --desc-file notes.md
+  clickup tasks create --space <name> --name "Kickoff" --start-date 2026-04-21 --due-date 2026-04-24
+  clickup tasks create --space <name> --name "Estimate" --time-estimate 90m --points 3
+  clickup tasks create --space <name> --name "Bug" --custom-field field-1=high --task-type type-1
 
 notes:
   Provide either --space or --list.
@@ -225,7 +232,9 @@ notes:
   space's default list, and --space can usually be omitted.
   --desc and --desc-file are mutually exclusive. Using both is an error.
   --assign assigns the task to a user ID.
-  Does not support: checklists, custom fields, attachments, or due dates.""",
+  --custom-field uses FIELD_ID=VALUE and is repeatable.
+  --task-type accepts a task/custom item type ID from `task-types list`.
+  Does not support: checklists or attachments.""",
     )
     tc.add_argument(
         "--space",
@@ -263,6 +272,38 @@ notes:
         type=str,
         dest="assign_user",
         help="Assign to a user ID",
+    )
+    tc.add_argument(
+        "--start-date",
+        type=str,
+        help="Task start date in YYYY-MM-DD format",
+    )
+    tc.add_argument(
+        "--due-date",
+        type=str,
+        help="Task due date in YYYY-MM-DD format",
+    )
+    tc.add_argument(
+        "--time-estimate",
+        type=str,
+        help="Time estimate like 90m, 2h, or 1d",
+    )
+    tc.add_argument(
+        "--points",
+        type=str,
+        help="Sprint points as a number",
+    )
+    tc.add_argument(
+        "--custom-field",
+        dest="custom_fields",
+        action="append",
+        metavar="FIELD_ID=VALUE",
+        help="Custom field to set after create (repeatable, format: field_uuid=value)",
+    )
+    tc.add_argument(
+        "--task-type",
+        type=str,
+        help="Task/custom item type ID from `task-types list`",
     )
 
     # tasks update

@@ -1,5 +1,8 @@
 """Write-oriented task handlers behind the facade."""
 
+from datetime import datetime, timezone
+import re
+
 from ...helpers import error, read_content
 from .shared import (
     _first_folderless_list_id,
@@ -7,6 +10,65 @@ from .shared import (
     _resolve_list_id,
     _resolve_priority,
 )
+
+
+_TIME_ESTIMATE_RE = re.compile(r"^(\d+)([mhd])$")
+
+
+def _parse_date_to_clickup_timestamp(raw, flag_name):
+    """Convert YYYY-MM-DD input into ClickUp's millisecond timestamp string."""
+    try:
+        parsed = datetime.strptime(raw, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        error(f"Invalid {flag_name} value (expected YYYY-MM-DD): {raw}")
+    return str(int(parsed.timestamp() * 1000))
+
+
+def _parse_time_estimate(raw):
+    """Convert compact duration strings into ClickUp milliseconds."""
+    match = _TIME_ESTIMATE_RE.fullmatch(raw.strip())
+    if not match:
+        error(f"Invalid --time-estimate value (expected <int><m|h|d>): {raw}")
+
+    amount = int(match.group(1))
+    unit = match.group(2)
+    multipliers = {"m": 60_000, "h": 3_600_000, "d": 86_400_000}
+    return amount * multipliers[unit]
+
+
+def _parse_points(raw):
+    """Normalize points to an int when possible, otherwise a float."""
+    try:
+        value = float(raw)
+    except ValueError:
+        error(f"Invalid --points value (expected a number): {raw}")
+
+    if value.is_integer():
+        return int(value)
+    return value
+
+
+def _resolve_task_type(client, raw_task_type):
+    """Validate an explicit task/custom item type against workspace metadata."""
+    response = client.get_v2(
+        f"/team/{client.runtime.workspace_id}/custom_item",
+        allow_dry_run=True,
+    )
+    task_types = response.get("custom_items", [])
+    if not task_types:
+        error(
+            "--task-type requires an available workspace custom item type; "
+            "run `clickup task-types list` first"
+        )
+
+    for task_type in task_types:
+        if task_type.get("id") == raw_task_type or task_type.get("name") == raw_task_type:
+            return {"id": task_type["id"], "source": "workspace_custom_item_types"}
+
+    error(
+        f"Unknown --task-type value: {raw_task_type}. "
+        "Run `clickup task-types list` to discover valid IDs."
+    )
 
 
 def cmd_tasks_create(client, args):
@@ -40,7 +102,49 @@ def cmd_tasks_create(client, args):
     if assign_user:
         body["assignees"] = [int(assign_user)]
 
+    start_date = getattr(args, "start_date", None)
+    if start_date:
+        body["start_date"] = _parse_date_to_clickup_timestamp(start_date, "--start-date")
+        body["start_date_time"] = True
+
+    due_date = getattr(args, "due_date", None)
+    if due_date:
+        body["due_date"] = _parse_date_to_clickup_timestamp(due_date, "--due-date")
+        body["due_date_time"] = True
+
+    time_estimate = getattr(args, "time_estimate", None)
+    if time_estimate:
+        body["time_estimate"] = _parse_time_estimate(time_estimate)
+
+    points = getattr(args, "points", None)
+    if points:
+        body["points"] = _parse_points(points)
+
+    custom_fields = [
+        _parse_custom_field(raw)
+        for raw in (getattr(args, "custom_fields", None) or [])
+    ]
+
+    task_type = None
+    raw_task_type = getattr(args, "task_type", None)
+    if raw_task_type:
+        task_type = _resolve_task_type(client, raw_task_type)
+        body["custom_item_id"] = task_type["id"]
+
     if client.dry_run:
+        if custom_fields or task_type:
+            return {
+                "dry_run": True,
+                "action": "create_task",
+                "create_body": body,
+                "post_create_custom_fields": [
+                    {"field_id": field_id, "value": value}
+                    for field_id, value in custom_fields
+                ],
+                "task_type": task_type,
+                "space": args.space,
+                "list_id": list_id,
+            }
         return {
             "dry_run": True,
             "body": body,
@@ -48,7 +152,15 @@ def cmd_tasks_create(client, args):
             "list_id": list_id,
         }
 
-    return client.post_v2(f"/list/{list_id}/task", data=body)
+    result = client.post_v2(f"/list/{list_id}/task", data=body)
+
+    for field_id, value in custom_fields:
+        client.post_v2(f"/task/{result['id']}/field/{field_id}", data={"value": value})
+
+    if custom_fields:
+        return client.get_v2(f"/task/{result['id']}")
+
+    return result
 
 
 def _parse_custom_field(raw):
