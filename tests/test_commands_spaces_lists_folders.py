@@ -21,10 +21,13 @@ from clickup_cli.commands.lists import (
     cmd_lists_update,
 )
 from clickup_cli.commands.spaces import (
+    cmd_spaces_create,
+    cmd_spaces_delete,
     cmd_spaces_get,
     cmd_spaces_list,
     cmd_spaces_privacy,
     cmd_spaces_statuses,
+    cmd_spaces_update,
 )
 
 from command_fakes import FlexClient
@@ -384,6 +387,122 @@ class SpacesGetTests(unittest.TestCase):
         self.assertIn("/space/99999", client.calls[0]["path"])
 
 
+class SpacesCreateTests(unittest.TestCase):
+
+    def test_create_dry_run(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(name="Platform", multiple_assignees=True)
+
+        result = cmd_spaces_create(client, args)
+
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["action"], "create_space")
+        self.assertEqual(result["workspace_id"], "test_workspace")
+        self.assertEqual(result["body"]["name"], "Platform")
+        self.assertTrue(result["body"]["multiple_assignees"])
+        self.assertIn("features", result["body"])
+        self.assertEqual(client.calls, [])
+
+    def test_create_live_request(self):
+        client = FlexClient(responses={"/space": {"id": "s1", "name": "Platform"}})
+        args = Namespace(name="Platform", multiple_assignees=False)
+
+        result = cmd_spaces_create(client, args)
+
+        self.assertEqual(result["id"], "s1")
+        call = client.calls[0]
+        self.assertEqual(call["method"], "POST")
+        self.assertIn("/team/test_workspace/space", call["path"])
+        self.assertEqual(call["data"]["name"], "Platform")
+        self.assertFalse(call["data"]["multiple_assignees"])
+        self.assertIn("features", call["data"])
+
+
+class SpacesUpdateTests(unittest.TestCase):
+
+    def test_update_dry_run_merges_required_fields(self):
+        client = FlexClient(
+            dry_run=True,
+            responses={
+                "/space/": {
+                    "id": "111",
+                    "name": "Platform",
+                    "color": "#123456",
+                    "private": True,
+                    "admin_can_manage": False,
+                    "multiple_assignees": False,
+                    "features": {"due_dates": {"enabled": True}},
+                }
+            },
+        )
+        args = Namespace(space="testspace", name="Platform API", multiple_assignees=True)
+
+        result = cmd_spaces_update(client, args)
+
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["action"], "update_space")
+        self.assertEqual(result["space_id"], "111")
+        self.assertEqual(
+            result["body"],
+            {
+                "name": "Platform API",
+                "color": "#123456",
+                "private": True,
+                "admin_can_manage": False,
+                "multiple_assignees": True,
+                "features": {"due_dates": {"enabled": True}},
+            },
+        )
+        self.assertEqual(len(client.calls), 1)
+        self.assertEqual(client.calls[0]["method"], "GET")
+        self.assertIn("/space/111", client.calls[0]["path"])
+
+    def test_update_live_request_uses_resolved_space_id(self):
+        client = FlexClient(
+            responses={
+                "/space/": [
+                    {
+                        "id": "333",
+                        "name": "Dev",
+                        "color": "#abcdef",
+                        "private": False,
+                        "admin_can_manage": True,
+                        "multiple_assignees": True,
+                        "features": {"sprints": {"enabled": False}},
+                    },
+                    {"id": "333", "name": "Platform API"},
+                ]
+            }
+        )
+        args = Namespace(space="dev", name="Platform API", multiple_assignees=None)
+
+        result = cmd_spaces_update(client, args)
+
+        self.assertEqual(result["id"], "333")
+        self.assertEqual(client.calls[0]["method"], "GET")
+        self.assertIn("/space/333", client.calls[0]["path"])
+        self.assertEqual(client.calls[1]["method"], "PUT")
+        self.assertIn("/space/333", client.calls[1]["path"])
+        self.assertEqual(
+            client.calls[1]["data"],
+            {
+                "name": "Platform API",
+                "color": "#abcdef",
+                "private": False,
+                "admin_can_manage": True,
+                "multiple_assignees": True,
+                "features": {"sprints": {"enabled": False}},
+            },
+        )
+
+    def test_update_noop_errors(self):
+        client = FlexClient()
+        args = Namespace(space="testspace", name=None, multiple_assignees=None)
+
+        with self.assertRaises(SystemExit):
+            cmd_spaces_update(client, args)
+
+
 class SpacesStatusesTests(unittest.TestCase):
 
     def test_statuses_with_data(self):
@@ -416,3 +535,27 @@ class SpacesPrivacyTests(unittest.TestCase):
         args = Namespace(space="999999", private=True, public=False)
         cmd_spaces_privacy(client, args)
         self.assertIn("/space/999999/acls", client.calls[0]["path"])
+
+
+class SpacesDeleteTests(unittest.TestCase):
+
+    def test_delete_dry_run(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(space="dev")
+
+        result = cmd_spaces_delete(client, args)
+
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["action"], "delete_space")
+        self.assertEqual(result["space_id"], "333")
+        self.assertEqual(client.calls, [])
+
+    def test_delete_live_request_uses_resolved_space_id(self):
+        client = FlexClient()
+        args = Namespace(space="dev")
+
+        result = cmd_spaces_delete(client, args)
+
+        self.assertEqual(result, {"status": "ok", "action": "deleted", "space_id": "333"})
+        self.assertEqual(client.calls[0]["method"], "DELETE")
+        self.assertIn("/space/333", client.calls[0]["path"])

@@ -1,7 +1,66 @@
-"""Space command handlers — list, get, statuses, privacy."""
+"""Space command handlers — list, get, create, update, delete, privacy."""
 
-from ..helpers import resolve_space_id, add_id_argument
+from ..helpers import error, resolve_space_id, add_id_argument
 from .privacy import handle_privacy_request, register_privacy_subcommand
+
+
+DEFAULT_SPACE_FEATURES = {
+    "due_dates": {"enabled": True, "start_date": False, "remap_due_dates": False, "remap_closed_due_date": False},
+    "time_tracking": {"enabled": True},
+    "tags": {"enabled": True},
+    "time_estimates": {"enabled": True},
+    "checklists": {"enabled": True},
+    "custom_fields": {"enabled": True},
+    "remap_dependencies": {"enabled": True},
+    "dependency_warning": {"enabled": True},
+    "portfolios": {"enabled": True},
+}
+
+
+def _add_assignee_mode_flags(parser, *, required):
+    """Add a bounded assignee-mode toggle for space mutations."""
+    mode = parser.add_mutually_exclusive_group(required=required)
+    mode.add_argument(
+        "--multiple-assignees",
+        dest="multiple_assignees",
+        action="store_const",
+        const=True,
+        default=None,
+        help="Allow multiple assignees per task",
+    )
+    mode.add_argument(
+        "--single-assignee",
+        dest="multiple_assignees",
+        action="store_const",
+        const=False,
+        default=None,
+        help="Restrict tasks to a single assignee",
+    )
+
+
+def _build_space_update_body(current_space, args):
+    """Preserve required space fields while applying bounded CLI updates."""
+    body = {
+        "name": current_space["name"],
+        "color": current_space["color"],
+        "private": current_space["private"],
+        "admin_can_manage": current_space["admin_can_manage"],
+        "multiple_assignees": current_space["multiple_assignees"],
+        "features": current_space["features"],
+    }
+
+    changed = False
+    if args.name:
+        body["name"] = args.name
+        changed = True
+    if args.multiple_assignees is not None:
+        body["multiple_assignees"] = args.multiple_assignees
+        changed = True
+
+    if not changed:
+        error("Nothing to update — provide at least one of: --name, --multiple-assignees, --single-assignee")
+
+    return body
 
 
 def register_parser(subparsers, F):
@@ -9,24 +68,30 @@ def register_parser(subparsers, F):
     spaces_parser = subparsers.add_parser(
         "spaces",
         formatter_class=F,
-        help="List spaces, view details, and discover statuses",
+        help="Full space CRUD: list, get, create, update, delete",
         description="""\
-Inspect workspace spaces — list all spaces, view space details, discover
-valid statuses, and toggle space privacy.
+Inspect workspace spaces — list all spaces, view space details, create,
+update, delete, discover valid statuses, and toggle space privacy.
 
 Subcommands:
   list      — list all spaces in the workspace
   get       — fetch full details of a specific space
+  create    — create a new space in the current workspace (mutating)
+  update    — update a space's bounded attributes (mutating)
+  delete    — delete a space (destructive)
   statuses  — list valid statuses for a space
   privacy   — make a space private or public (mutating)
 
-list / get / statuses are read-only. privacy is mutating and supports
---dry-run. Configured space names and raw ClickUp space IDs are both
-accepted.""",
+list / get / statuses are read-only. create / update / delete / privacy
+are mutating and support --dry-run. Configured space names and raw
+ClickUp space IDs are both accepted where a target space is required.""",
         epilog="""\
 examples:
   clickup spaces list
   clickup spaces get <space>
+  clickup spaces create --name "Platform" --multiple-assignees
+  clickup spaces update <space> --name "Platform API"
+  clickup --dry-run spaces delete <space>
   clickup spaces statuses <space>
   clickup spaces privacy <space> --private
   clickup --dry-run spaces privacy <space> --public
@@ -78,6 +143,75 @@ examples:
   clickup --pretty spaces get <space>""",
     )
     add_id_argument(sg, "space", "Space name (from config) or raw space ID")
+
+    # spaces create
+    sc = spaces_sub.add_parser(
+        "create",
+        formatter_class=F,
+        help="Create a new space in the current workspace",
+        description="""\
+Create a new space in the current runtime workspace. This is a mutating
+command.
+
+Use --dry-run to preview the request body without creating the space.
+Global flags may appear before or after the command group:
+  clickup --dry-run spaces create --name "Platform" --multiple-assignees""",
+        epilog="""\
+returns:
+  The created space object from the API.
+
+examples:
+  clickup spaces create --name "Platform" --multiple-assignees
+  clickup --dry-run spaces create --name "Platform" --single-assignee""",
+    )
+    sc.add_argument("--name", required=True, help="Space name (required)")
+    _add_assignee_mode_flags(sc, required=True)
+
+    # spaces update
+    su = spaces_sub.add_parser(
+        "update",
+        formatter_class=F,
+        help="Update a space (name, assignee mode)",
+        description="""\
+Update a space's bounded attributes. This is a mutating command.
+
+At least one mutable field is required: --name, --multiple-assignees, or
+--single-assignee. Use --dry-run to preview the merged request body
+without applying changes.""",
+        epilog="""\
+returns:
+  The updated space object from the API.
+
+examples:
+  clickup spaces update <space> --name "Platform API"
+  clickup --dry-run spaces update <space> --multiple-assignees
+  clickup spaces update --space <space> --single-assignee""",
+    )
+    add_id_argument(su, "space", "Space name (from config) or raw space ID to update")
+    su.add_argument("--name", type=str, help="New space name")
+    _add_assignee_mode_flags(su, required=False)
+
+    # spaces delete
+    sd = spaces_sub.add_parser(
+        "delete",
+        formatter_class=F,
+        help="Delete a space (destructive)",
+        description="""\
+Delete a space permanently. This is a destructive, irreversible command.
+
+Deleting a space removes its folders, lists, and tasks. Use with extreme
+caution.
+
+Use --dry-run to preview the operation without deleting anything.""",
+        epilog="""\
+returns:
+  {"status": "ok", "action": "deleted", "space_id": "..."}
+
+examples:
+  clickup --dry-run spaces delete <space>
+  clickup spaces delete --space <space>""",
+    )
+    add_id_argument(sd, "space", "Space name (from config) or raw space ID to delete")
 
     # spaces statuses
     ss = spaces_sub.add_parser(
@@ -151,6 +285,41 @@ def cmd_spaces_get(client, args):
     return client.get_v2(f"/space/{space_id}")
 
 
+def cmd_spaces_create(client, args):
+    """Create a space in the current runtime workspace."""
+    body = {
+        "name": args.name,
+        "multiple_assignees": args.multiple_assignees,
+        "features": DEFAULT_SPACE_FEATURES,
+    }
+
+    if client.dry_run:
+        return {
+            "dry_run": True,
+            "action": "create_space",
+            "workspace_id": client.runtime.workspace_id,
+            "body": body,
+        }
+
+    return client.post_v2(f"/team/{client.runtime.workspace_id}/space", data=body)
+
+
+def cmd_spaces_update(client, args):
+    """Update a space's bounded attributes."""
+    space_id = resolve_space_id(args.space)
+
+    if not args.name and args.multiple_assignees is None:
+        error("Nothing to update — provide at least one of: --name, --multiple-assignees, --single-assignee")
+
+    current_space = client.get_v2(f"/space/{space_id}", allow_dry_run=True)
+    body = _build_space_update_body(current_space, args)
+
+    if client.dry_run:
+        return {"dry_run": True, "action": "update_space", "space_id": space_id, "body": body}
+
+    return client.put_v2(f"/space/{space_id}", data=body)
+
+
 def cmd_spaces_statuses(client, args):
     """List valid statuses for a space."""
     space_id = resolve_space_id(args.space)
@@ -182,12 +351,26 @@ def cmd_spaces_privacy(client, args):
         path_segment="space",
     )
 
+
+def cmd_spaces_delete(client, args):
+    """Delete a space by configured alias or raw ID."""
+    space_id = resolve_space_id(args.space)
+
+    if client.dry_run:
+        return {"dry_run": True, "action": "delete_space", "space_id": space_id}
+
+    client.delete_v2(f"/space/{space_id}")
+    return {"status": "ok", "action": "deleted", "space_id": space_id}
+
 COMMAND_MANIFEST = {
     "group": "spaces",
     "register_parser": register_parser,
     "handlers": {
         "list": cmd_spaces_list,
         "get": cmd_spaces_get,
+        "create": cmd_spaces_create,
+        "update": cmd_spaces_update,
+        "delete": cmd_spaces_delete,
         "statuses": cmd_spaces_statuses,
         "privacy": cmd_spaces_privacy,
     },

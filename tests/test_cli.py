@@ -644,6 +644,41 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.command, "statuses")
         self.assertEqual(args.space, "myspace")
 
+    def test_spaces_create_multiple_assignees(self):
+        args = self._parse(["spaces", "create", "--name", "Platform", "--multiple-assignees"])
+        self.assertEqual(args.command, "create")
+        self.assertEqual(args.name, "Platform")
+        self.assertTrue(args.multiple_assignees)
+
+    def test_spaces_create_single_assignee(self):
+        args = self._parse(["spaces", "create", "--name", "Platform", "--single-assignee"])
+        self.assertEqual(args.command, "create")
+        self.assertFalse(args.multiple_assignees)
+
+    def test_spaces_update_positional_target(self):
+        args = self._parse(["spaces", "update", "myspace", "--name", "Platform API"])
+        self.assertEqual(args.command, "update")
+        self.assertEqual(args.space, "myspace")
+        self.assertEqual(args.name, "Platform API")
+
+    def test_spaces_update_flag_target(self):
+        args = self._parse(["spaces", "update", "--space", "myspace", "--multiple-assignees"])
+        resolve_id_args(args)
+        self.assertEqual(args.command, "update")
+        self.assertEqual(args.space, "myspace")
+        self.assertTrue(args.multiple_assignees)
+
+    def test_spaces_delete_positional_target(self):
+        args = self._parse(["spaces", "delete", "myspace"])
+        self.assertEqual(args.command, "delete")
+        self.assertEqual(args.space, "myspace")
+
+    def test_spaces_delete_flag_target(self):
+        args = self._parse(["spaces", "delete", "--space", "dev"])
+        resolve_id_args(args)
+        self.assertEqual(args.command, "delete")
+        self.assertEqual(args.space, "dev")
+
     def test_privacy_private(self):
         cases = [
             ("spaces", "space", "myspace"),
