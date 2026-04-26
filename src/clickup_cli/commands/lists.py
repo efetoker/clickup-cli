@@ -1,6 +1,7 @@
 """List command handlers — list, get, create, update, delete, privacy."""
 
 from ..helpers import read_content, error, resolve_space_id, add_id_argument
+from .backup import backup_list, backup_options, count_list_tasks
 from .privacy import handle_privacy_request, register_privacy_subcommand
 
 
@@ -22,6 +23,7 @@ Subcommands:
   create   — create a new list in a folder or space (mutating)
   update   — update a list's name, content, or status (mutating)
   delete   — delete a list (destructive)
+  backup   — export list metadata, tasks, and comments to local JSON files
   privacy  — make a list private or public (mutating)""",
         epilog="""\
 examples:
@@ -199,6 +201,35 @@ examples:
     )
     add_id_argument(ld, "list_id", "ClickUp list ID to delete")
 
+    lb = lists_sub.add_parser(
+        "backup",
+        formatter_class=F,
+        help="Back up a list to local JSON files",
+        description="""\
+Back up a list before migration or deletion. Writes list metadata, task-list
+JSON, per-task full JSON, and a deterministic manifest.json to --output-dir.
+
+Defaults are safety-first: include closed tasks, archived tasks, subtasks,
+all task pages, and all comments unless explicitly disabled.""",
+        epilog="""\
+returns:
+  {"status": "ok", "action": "backup_list", "list_id": "...", ...}
+
+examples:
+  clickup lists backup 12345 --output-dir ./backup/list-12345
+  clickup lists backup --list-id 12345 --output-dir ./backup --no-comments
+
+notes:
+  This command writes local files and does not mutate ClickUp.""",
+    )
+    add_id_argument(lb, "list_id", "ClickUp list ID to back up")
+    lb.add_argument("--output-dir", required=True, help="Directory for backup JSON files")
+    lb.add_argument("--no-closed", action="store_true", help="Do not include closed tasks")
+    lb.add_argument("--no-archived", action="store_true", help="Do not include archived tasks")
+    lb.add_argument("--no-subtasks", action="store_true", help="Do not include subtasks")
+    lb.add_argument("--first-page", action="store_true", help="Only fetch the first task page")
+    lb.add_argument("--no-comments", action="store_true", help="Do not hydrate task comments")
+
     register_privacy_subcommand(
         lists_sub,
         F,
@@ -292,10 +323,37 @@ def cmd_lists_update(client, args):
 def cmd_lists_delete(client, args):
     """Delete a list by ID."""
     if client.dry_run:
-        return {"dry_run": True, "action": "delete_list", "list_id": args.list_id}
+        list_meta = client.get_v2(f"/list/{args.list_id}", allow_dry_run=True)
+        task_counts = count_list_tasks(client, args.list_id)
+        return {
+            "dry_run": True,
+            "action": "delete_list",
+            "list_id": args.list_id,
+            "list": list_meta,
+            "task_counts": task_counts,
+        }
 
     client.delete_v2(f"/list/{args.list_id}")
     return {"status": "ok", "action": "deleted", "list_id": args.list_id}
+
+
+def cmd_lists_backup(client, args):
+    """Back up a list to local JSON files."""
+    manifest = backup_list(
+        client,
+        args.list_id,
+        args.output_dir,
+        backup_options(args),
+    )
+    return {
+        "status": "ok",
+        "action": "backup_list",
+        "list_id": args.list_id,
+        "output_dir": args.output_dir,
+        "manifest": "manifest.json",
+        "task_count": manifest["task_count"],
+        "complete": manifest["complete"],
+    }
 
 
 def cmd_lists_privacy(client, args):
@@ -317,6 +375,7 @@ COMMAND_MANIFEST = {
         "create": cmd_lists_create,
         "update": cmd_lists_update,
         "delete": cmd_lists_delete,
+        "backup": cmd_lists_backup,
         "privacy": cmd_lists_privacy,
     },
 }

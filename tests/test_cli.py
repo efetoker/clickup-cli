@@ -746,6 +746,23 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.command, "delete")
         self.assertEqual(args.folder_id, "f123")
 
+    def test_folders_backup(self):
+        args = self._parse(["folders", "backup", "f123", "--output-dir", "backup"])
+        self.assertEqual(args.command, "backup")
+        self.assertEqual(args.folder_id, "f123")
+        self.assertEqual(args.output_dir, "backup")
+
+    def test_folders_purge_empty(self):
+        args = self._parse(["folders", "purge-empty", "f123"])
+        self.assertEqual(args.command, "purge-empty")
+        self.assertEqual(args.folder_id, "f123")
+
+    def test_lists_backup(self):
+        args = self._parse(["lists", "backup", "l123", "--output-dir", "backup"])
+        self.assertEqual(args.command, "backup")
+        self.assertEqual(args.list_id, "l123")
+        self.assertEqual(args.output_dir, "backup")
+
     # --- team ---
 
     def test_team_whoami(self):

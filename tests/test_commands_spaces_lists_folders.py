@@ -1,18 +1,24 @@
 """Handler tests for spaces, lists, and folders commands."""
 
+import json
+import tempfile
 import unittest
 from argparse import Namespace
+from pathlib import Path
 from types import SimpleNamespace
 
 from clickup_cli.commands.folders import (
+    cmd_folders_backup,
     cmd_folders_create,
     cmd_folders_delete,
     cmd_folders_get,
     cmd_folders_list,
+    cmd_folders_purge_empty,
     cmd_folders_privacy,
     cmd_folders_update,
 )
 from clickup_cli.commands.lists import (
+    cmd_lists_backup,
     cmd_lists_create,
     cmd_lists_delete,
     cmd_lists_get,
@@ -92,10 +98,19 @@ class FoldersUpdateTests(unittest.TestCase):
 class FoldersDeleteTests(unittest.TestCase):
 
     def test_delete_dry_run(self):
-        client = FlexClient(dry_run=True)
+        client = FlexClient(
+            dry_run=True,
+            responses={
+                "/folder/f1": {"id": "f1", "name": "Archive", "lists": [{"id": "l1", "name": "Tasks"}]},
+                "/list/l1/task": {"tasks": [{"id": "t1"}], "last_page": True},
+            },
+        )
         args = Namespace(folder_id="f1")
         result = cmd_folders_delete(client, args)
         self.assertTrue(result["dry_run"])
+        self.assertEqual(result["folder"]["id"], "f1")
+        self.assertEqual(result["task_counts"]["total"], 1)
+        self.assertTrue(result["task_counts"]["complete"])
 
     def test_delete_actual(self):
         client = FlexClient()
@@ -103,6 +118,71 @@ class FoldersDeleteTests(unittest.TestCase):
         result = cmd_folders_delete(client, args)
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["action"], "deleted")
+
+
+class FoldersBackupTests(unittest.TestCase):
+
+    def test_backup_discovers_child_lists_and_writes_manifest(self):
+        client = FlexClient(
+            responses={
+                "/folder/f1": {"id": "f1", "name": "Archive", "lists": [{"id": "l1", "name": "Tasks"}]},
+                "/list/l1/task": {"tasks": [{"id": "t1"}], "last_page": True},
+                "/task/t1/comment": {"comments": [], "last_page": True},
+                "/task/t1": {"id": "t1", "name": "Task one"},
+                "/list/l1": {"id": "l1", "name": "Tasks"},
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = Namespace(
+                folder_id="f1",
+                output_dir=tmpdir,
+                no_closed=False,
+                no_archived=False,
+                no_subtasks=False,
+                first_page=False,
+                no_comments=False,
+            )
+            result = cmd_folders_backup(client, args)
+            manifest = json.loads(Path(tmpdir, "manifest.json").read_text())
+
+        self.assertEqual(result["action"], "backup_folder")
+        self.assertEqual(manifest["folder_id"], "f1")
+        self.assertEqual(manifest["list_ids"], ["l1"])
+        self.assertEqual(manifest["task_count"], 1)
+        self.assertIn("lists/l1/tasks/t1.json", manifest["files"])
+
+
+class FoldersPurgeEmptyTests(unittest.TestCase):
+
+    def test_purge_empty_refuses_when_any_child_list_has_tasks(self):
+        client = FlexClient(
+            responses={
+                "/folder/f1": {"id": "f1", "name": "Archive", "lists": [{"id": "l1", "name": "Tasks"}]},
+                "/list/l1/task": {"tasks": [{"id": "t1"}], "last_page": True},
+            }
+        )
+        args = Namespace(folder_id="f1")
+
+        with self.assertRaises(SystemExit):
+            cmd_folders_purge_empty(client, args)
+
+    def test_purge_empty_dry_run_reports_deletable_when_all_lists_empty(self):
+        client = FlexClient(
+            dry_run=True,
+            responses={
+                "/folder/f1": {"id": "f1", "name": "Archive", "lists": [{"id": "l1", "name": "Tasks"}]},
+                "/list/l1/task": {"tasks": [], "last_page": True},
+            },
+        )
+        args = Namespace(folder_id="f1")
+
+        result = cmd_folders_purge_empty(client, args)
+
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["action"], "purge_empty_folder")
+        self.assertTrue(result["deletable"])
+        self.assertEqual(result["task_counts"]["total"], 0)
 
 
 class FoldersPrivacyTests(unittest.TestCase):
@@ -330,16 +410,99 @@ class ListsUpdateTests(unittest.TestCase):
 class ListsDeleteTests(unittest.TestCase):
 
     def test_delete_dry_run(self):
-        client = FlexClient(dry_run=True)
+        client = FlexClient(
+            dry_run=True,
+            responses={
+                "/list/l1/task": {"tasks": [{"id": "t1"}], "last_page": True},
+                "/list/l1": {"id": "l1", "name": "Tasks"},
+            },
+        )
         args = Namespace(list_id="l1")
         result = cmd_lists_delete(client, args)
         self.assertTrue(result["dry_run"])
+        self.assertEqual(result["list"]["id"], "l1")
+        self.assertEqual(result["task_counts"]["total"], 1)
+        self.assertTrue(result["task_counts"]["complete"])
 
     def test_delete_actual(self):
         client = FlexClient()
         args = Namespace(list_id="l1")
         result = cmd_lists_delete(client, args)
         self.assertEqual(result["status"], "ok")
+
+
+class ListsBackupTests(unittest.TestCase):
+
+    def test_backup_defaults_to_exhaustive_task_and_comment_capture(self):
+        client = FlexClient(
+            responses={
+                "/list/l1/task": {"tasks": [{"id": "t1"}], "last_page": True},
+                "/task/t1/comment": [{"comments": [{"id": "c1", "date": "1"}]}, {"comments": []}],
+                "/task/t1": {"id": "t1", "name": "Task one"},
+                "/list/l1": {"id": "l1", "name": "Tasks"},
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = Namespace(
+                list_id="l1",
+                output_dir=tmpdir,
+                no_closed=False,
+                no_archived=False,
+                no_subtasks=False,
+                first_page=False,
+                no_comments=False,
+            )
+            result = cmd_lists_backup(client, args)
+            manifest = json.loads(Path(tmpdir, "manifest.json").read_text())
+            task = json.loads(Path(tmpdir, "tasks", "t1.json").read_text())
+
+        task_calls = [call for call in client.calls if call["path"] == "/list/l1/task"]
+        self.assertEqual(result["action"], "backup_list")
+        self.assertEqual(manifest["list_id"], "l1")
+        self.assertEqual(manifest["task_ids"], ["t1"])
+        self.assertEqual(manifest["task_count"], 1)
+        self.assertTrue(manifest["options"]["include_closed"])
+        self.assertTrue(manifest["options"]["include_archived"])
+        self.assertTrue(manifest["options"]["subtasks"])
+        self.assertTrue(manifest["options"]["all_pages"])
+        self.assertTrue(manifest["options"]["comments"])
+        self.assertEqual(task["comments"], [{"id": "c1", "date": "1"}])
+        self.assertIn("tasks/t1.json", manifest["files"])
+        self.assertEqual(task_calls[0]["params"]["include_closed"], "true")
+        self.assertEqual(task_calls[0]["params"]["subtasks"], "true")
+        self.assertEqual(task_calls[1]["params"]["archived"], "true")
+
+    def test_backup_allows_safety_default_opt_outs(self):
+        client = FlexClient(
+            responses={
+                "/list/l1/task": {"tasks": [], "last_page": True},
+                "/list/l1": {"id": "l1", "name": "Tasks"},
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = Namespace(
+                list_id="l1",
+                output_dir=tmpdir,
+                no_closed=True,
+                no_archived=True,
+                no_subtasks=True,
+                first_page=True,
+                no_comments=True,
+            )
+            cmd_lists_backup(client, args)
+            manifest = json.loads(Path(tmpdir, "manifest.json").read_text())
+
+        task_calls = [call for call in client.calls if call["path"] == "/list/l1/task"]
+        self.assertFalse(manifest["options"]["include_closed"])
+        self.assertFalse(manifest["options"]["include_archived"])
+        self.assertFalse(manifest["options"]["subtasks"])
+        self.assertFalse(manifest["options"]["all_pages"])
+        self.assertFalse(manifest["options"]["comments"])
+        self.assertNotIn("include_closed", task_calls[0]["params"])
+        self.assertNotIn("subtasks", task_calls[0]["params"])
+        self.assertEqual(len(task_calls), 1)
 
 
 # ─── Spaces ───────────────────────────────────────────────────────────────
