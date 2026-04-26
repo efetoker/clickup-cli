@@ -894,6 +894,42 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.command, "move")
         self.assertEqual(args.to_list, "dev")
 
+    def test_tasks_bulk_move(self):
+        args = self._parse([
+            "tasks",
+            "bulk",
+            "move",
+            "--task-id",
+            "a",
+            "--task-id",
+            "b",
+            "--task-file",
+            "ids.txt",
+            "--to",
+            "dev",
+            "--continue-on-error",
+        ])
+        self.assertEqual(args.command, "bulk")
+        self.assertEqual(args.subcommand, "move")
+        self.assertEqual(args.task_ids, ["a", "b"])
+        self.assertEqual(args.task_file, "ids.txt")
+        self.assertEqual(args.to_list, "dev")
+        self.assertTrue(args.continue_on_error)
+
+    def test_tasks_bulk_tags(self):
+        args = self._parse([
+            "tasks",
+            "bulk",
+            "tags",
+            "--plan",
+            "plan.json",
+            "--continue-on-error",
+        ])
+        self.assertEqual(args.command, "bulk")
+        self.assertEqual(args.subcommand, "tags")
+        self.assertEqual(args.plan_file, "plan.json")
+        self.assertTrue(args.continue_on_error)
+
     def test_tasks_search_all_pages(self):
         args = self._parse(["tasks", "search", "bug", "--all-pages"])
         self.assertTrue(args.all_pages)

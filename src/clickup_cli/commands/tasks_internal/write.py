@@ -1,6 +1,7 @@
 """Write-oriented task handlers behind the facade."""
 
 from datetime import datetime, timezone
+import json
 import re
 
 from ...helpers import error, read_content
@@ -255,11 +256,7 @@ def cmd_tasks_delete(client, args):
 
 def cmd_tasks_move(client, args):
     """Move a task by resolving `--to` as a space alias or raw list ID."""
-    space = client.runtime.spaces.get(args.to_list)
-    if space:
-        list_id = space.get("list_id") or _first_folderless_list_id(client, space["space_id"])
-    else:
-        list_id = args.to_list
+    list_id = _resolve_move_destination(client, args.to_list)
 
     if client.dry_run:
         return {
@@ -271,6 +268,118 @@ def cmd_tasks_move(client, args):
     return client.put_v3(
         f"/workspaces/{client.runtime.workspace_id}/tasks/{args.task_id}/home_list/{list_id}"
     )
+
+
+def _resolve_move_destination(client, to_list):
+    space = client.runtime.spaces.get(to_list)
+    if space:
+        return space.get("list_id") or _first_folderless_list_id(client, space["space_id"])
+    return to_list
+
+
+def cmd_tasks_bulk(client, args):
+    """Dispatch explicit bulk task operations."""
+    if args.subcommand == "move":
+        return _tasks_bulk_move(client, args)
+    if args.subcommand == "tags":
+        return _tasks_bulk_tags(client, args)
+    error(f"Unknown tasks bulk subcommand: {args.subcommand}")
+
+
+def _bulk_task_ids(args):
+    task_ids = list(getattr(args, "task_ids", None) or [])
+    task_file = getattr(args, "task_file", None)
+    if task_file:
+        with open(task_file, encoding="utf-8") as handle:
+            task_ids.extend(line.strip() for line in handle if line.strip())
+    if not task_ids:
+        error("Provide at least one --task-id or --task-file")
+    return task_ids
+
+
+def _bulk_result(action, completed, failed, remaining, failed_task_id=None):
+    return {
+        "status": "ok" if not failed else "partial_failure",
+        "action": action,
+        "completed": completed,
+        "failed": failed,
+        "failed_task_id": failed_task_id,
+        "remaining": remaining,
+        "resume_from": failed_task_id,
+    }
+
+
+def _tasks_bulk_move(client, args):
+    task_ids = _bulk_task_ids(args)
+    list_id = _resolve_move_destination(client, args.to_list)
+    if client.dry_run:
+        return {
+            "dry_run": True,
+            "action": "bulk_move",
+            "task_ids": task_ids,
+            "destination_list_id": list_id,
+            "continue_on_error": args.continue_on_error,
+        }
+
+    completed = []
+    failed = []
+    for index, task_id in enumerate(task_ids):
+        try:
+            client.put_v3(
+                f"/workspaces/{client.runtime.workspace_id}/tasks/{task_id}/home_list/{list_id}"
+            )
+            completed.append(task_id)
+        except Exception as exc:  # noqa: BLE001 - bulk output must report API failure details
+            failed.append({"task_id": task_id, "error": str(exc)})
+            if not args.continue_on_error:
+                return _bulk_result("bulk_move", completed, failed, task_ids[index:], task_id)
+    return _bulk_result("bulk_move", completed, failed, [], None)
+
+
+def _load_bulk_tag_plan(plan_file):
+    with open(plan_file, encoding="utf-8") as handle:
+        plan = json.load(handle)
+    normalized_tasks = []
+    for task in plan.get("tasks", []):
+        operations = [
+            {"action": op.get("action"), "tag": op.get("tag", "").lower()}
+            for op in task.get("operations", [])
+        ]
+        normalized_tasks.append({"task_id": task.get("task_id"), "operations": operations})
+    return {"tasks": normalized_tasks}
+
+
+def _tasks_bulk_tags(client, args):
+    plan = _load_bulk_tag_plan(args.plan_file)
+    if client.dry_run:
+        return {
+            "dry_run": True,
+            "action": "bulk_tags",
+            "plan": plan,
+            "continue_on_error": args.continue_on_error,
+        }
+
+    task_ids = [task.get("task_id") for task in plan["tasks"]]
+    completed = []
+    failed = []
+    for index, task in enumerate(plan["tasks"]):
+        task_id = task.get("task_id")
+        try:
+            for operation in task.get("operations", []):
+                action = operation.get("action")
+                tag = operation.get("tag")
+                if action == "add":
+                    client.post_v2(f"/task/{task_id}/tag/{tag}", data={})
+                elif action == "remove":
+                    client.delete_v2(f"/task/{task_id}/tag/{tag}")
+                else:
+                    error(f"Invalid bulk tag action for task {task_id}: {action}")
+            completed.append(task_id)
+        except Exception as exc:  # noqa: BLE001 - bulk output must report API failure details
+            failed.append({"task_id": task_id, "error": str(exc)})
+            if not args.continue_on_error:
+                return _bulk_result("bulk_tags", completed, failed, task_ids[index:], task_id)
+    return _bulk_result("bulk_tags", completed, failed, [], None)
 
 
 def cmd_tasks_lists(client, args):

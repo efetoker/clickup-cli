@@ -8,6 +8,7 @@ from .tasks_internal.read import (
 )
 from .tasks_internal.write import (
     cmd_tasks_add_to_list as cmd_tasks_add_to_list,
+    cmd_tasks_bulk as cmd_tasks_bulk,
     cmd_tasks_create as cmd_tasks_create,
     cmd_tasks_delete as cmd_tasks_delete,
     cmd_tasks_depend as cmd_tasks_depend,
@@ -34,6 +35,7 @@ COMMAND_MANIFEST = {
         "lists": cmd_tasks_lists,
         "add-to-list": cmd_tasks_add_to_list,
         "remove-from-list": cmd_tasks_remove_from_list,
+        "bulk": cmd_tasks_bulk,
         "link": cmd_tasks_link,
         "depend": cmd_tasks_depend,
     },

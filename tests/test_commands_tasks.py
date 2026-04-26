@@ -3,12 +3,14 @@
 import argparse
 import contextlib
 import io
+import json
 import tempfile
 import unittest
 from argparse import Namespace
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from clickup_cli.commands import tasks as tasks_commands
 from clickup_cli.commands.tasks import (
     cmd_tasks_add_to_list,
     cmd_tasks_create,
@@ -1158,6 +1160,135 @@ class TasksMultiListTests(unittest.TestCase):
             cmd_tasks_remove_from_list(client, self._membership_args())
 
         client.put_v3.assert_not_called()
+
+
+class TasksBulkTests(unittest.TestCase):
+
+    def test_bulk_move_dry_run_combines_ids_and_file(self):
+        client = FlexClient(dry_run=True)
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            handle.write("file-1\n\nfile-2\n")
+            handle.flush()
+            args = Namespace(
+                subcommand="move",
+                task_ids=["arg-1"],
+                task_file=handle.name,
+                to_list="dev",
+                continue_on_error=False,
+            )
+
+            result = tasks_commands.cmd_tasks_bulk(client, args)
+
+        self.assertEqual(result["action"], "bulk_move")
+        self.assertEqual(result["task_ids"], ["arg-1", "file-1", "file-2"])
+        self.assertEqual(result["destination_list_id"], "444")
+        self.assertEqual(client.calls, [])
+
+    def test_bulk_move_stops_on_first_failure_with_resume_details(self):
+        client = MagicMock()
+        client.dry_run = False
+        client.runtime = SimpleNamespace(workspace_id="ws", spaces={})
+        client.put_v3.side_effect = [{"id": "a"}, RuntimeError("boom")]
+        args = Namespace(
+            subcommand="move",
+            task_ids=["a", "b", "c"],
+            task_file=None,
+            to_list="dest",
+            continue_on_error=False,
+        )
+
+        result = tasks_commands.cmd_tasks_bulk(client, args)
+
+        self.assertEqual(result["completed"], ["a"])
+        self.assertEqual(result["failed_task_id"], "b")
+        self.assertEqual(result["remaining"], ["b", "c"])
+        self.assertEqual(result["resume_from"], "b")
+        self.assertEqual(client.put_v3.call_count, 2)
+
+    def test_bulk_move_continue_on_error_records_failures(self):
+        client = MagicMock()
+        client.dry_run = False
+        client.runtime = SimpleNamespace(workspace_id="ws", spaces={})
+        client.put_v3.side_effect = [{"id": "a"}, RuntimeError("boom"), {"id": "c"}]
+        args = Namespace(
+            subcommand="move",
+            task_ids=["a", "b", "c"],
+            task_file=None,
+            to_list="dest",
+            continue_on_error=True,
+        )
+
+        result = tasks_commands.cmd_tasks_bulk(client, args)
+
+        self.assertEqual(result["completed"], ["a", "c"])
+        self.assertEqual(result["failed"], [{"task_id": "b", "error": "boom"}])
+        self.assertIsNone(result["resume_from"])
+        self.assertEqual(client.put_v3.call_count, 3)
+
+    def test_bulk_tags_dry_run_reads_plan(self):
+        client = FlexClient(dry_run=True)
+        plan = {"tasks": [{"task_id": "a", "operations": [{"action": "add", "tag": "Urgent"}]}]}
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            json.dump(plan, handle)
+            handle.flush()
+            result = tasks_commands.cmd_tasks_bulk(
+                client,
+                Namespace(subcommand="tags", plan_file=handle.name, continue_on_error=False),
+            )
+
+        self.assertEqual(result["action"], "bulk_tags")
+        self.assertEqual(result["plan"]["tasks"][0]["operations"][0]["tag"], "urgent")
+        self.assertEqual(client.calls, [])
+
+    def test_bulk_tags_preserves_operation_order(self):
+        client = FlexClient()
+        plan = {
+            "tasks": [
+                {
+                    "task_id": "a",
+                    "operations": [
+                        {"action": "add", "tag": "Urgent"},
+                        {"action": "remove", "tag": "Draft"},
+                    ],
+                }
+            ]
+        }
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            json.dump(plan, handle)
+            handle.flush()
+            result = tasks_commands.cmd_tasks_bulk(
+                client,
+                Namespace(subcommand="tags", plan_file=handle.name, continue_on_error=False),
+            )
+
+        self.assertEqual(result["completed"], ["a"])
+        self.assertEqual(
+            [(call["method"], call["path"]) for call in client.calls],
+            [("POST", "/task/a/tag/urgent"), ("DELETE", "/task/a/tag/draft")],
+        )
+
+    def test_bulk_tags_stops_on_first_failed_task(self):
+        client = MagicMock()
+        client.dry_run = False
+        client.post_v2.side_effect = [None, RuntimeError("boom")]
+        plan = {
+            "tasks": [
+                {"task_id": "a", "operations": [{"action": "add", "tag": "ok"}]},
+                {"task_id": "b", "operations": [{"action": "add", "tag": "bad"}]},
+                {"task_id": "c", "operations": [{"action": "add", "tag": "later"}]},
+            ]
+        }
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            json.dump(plan, handle)
+            handle.flush()
+            result = tasks_commands.cmd_tasks_bulk(
+                client,
+                Namespace(subcommand="tags", plan_file=handle.name, continue_on_error=False),
+            )
+
+        self.assertEqual(result["completed"], ["a"])
+        self.assertEqual(result["failed_task_id"], "b")
+        self.assertEqual(result["remaining"], ["b", "c"])
 
 
 class RawIdFlagAcceptanceTests(unittest.TestCase):

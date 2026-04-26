@@ -690,6 +690,50 @@ examples:
         help="Additional ClickUp list ID to remove the task from",
     )
 
+    # tasks bulk — explicit batch operations
+    tb = tasks_sub.add_parser(
+        "bulk",
+        formatter_class=F,
+        help="Run explicit bulk task migration operations",
+        description="""\
+Run explicit bulk task operations from task IDs or JSON plans.
+
+Bulk operations are mutation workflows designed for migration work. They are
+dry-run friendly, stop on first failure by default, and return resume-oriented
+details for live failures.""",
+        epilog="""\
+examples:
+  clickup --dry-run tasks bulk move --task-id abc --task-id def --to <space-or-list-id>
+  clickup tasks bulk move --task-file ids.txt --to <space-or-list-id>
+  clickup --dry-run tasks bulk tags --plan bulk-tags.json""",
+    )
+    tb_sub = tb.add_subparsers(dest="subcommand", required=True)
+
+    tbm = tb_sub.add_parser(
+        "move",
+        formatter_class=F,
+        help="Move multiple tasks to a destination list/space",
+        description="""\
+Move multiple tasks to the same destination list. Accepts repeated --task-id
+values and/or a newline-delimited --task-file. Live runs stop on first failure
+unless --continue-on-error is set.""",
+    )
+    tbm.add_argument("--task-id", dest="task_ids", action="append", help="Task ID to move (repeatable)")
+    tbm.add_argument("--task-file", help="Path to newline-delimited task IDs")
+    tbm.add_argument("--to", required=True, dest="to_list", help="Destination space name or raw list ID")
+    tbm.add_argument("--continue-on-error", action="store_true", help="Continue after per-task failures")
+
+    tbt = tb_sub.add_parser(
+        "tags",
+        formatter_class=F,
+        help="Apply bulk tag add/remove operations from a JSON plan",
+        description="""\
+Apply ordered per-task tag add/remove operations from a JSON plan file.
+Expected shape: {"tasks": [{"task_id": "...", "operations": [{"action": "add|remove", "tag": "..."}]}]}.""",
+    )
+    tbt.add_argument("--plan", required=True, dest="plan_file", help="Path to bulk tag JSON plan")
+    tbt.add_argument("--continue-on-error", action="store_true", help="Continue after per-task failures")
+
     # tasks depend — subcommand group for dependency CRUD
     tdp = tasks_sub.add_parser(
         "depend",
