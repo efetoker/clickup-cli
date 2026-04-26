@@ -798,6 +798,19 @@ class ParserComprehensiveTests(unittest.TestCase):
         args = self._parse(["tasks", "get", "abc123", "--all-comments"])
         self.assertTrue(args.all_comments)
 
+    def test_tasks_get_fields(self):
+        args = self._parse(["tasks", "get", "abc123", "--fields", "id,name"])
+        self.assertEqual(args.fields, "id,name")
+
+    def test_tasks_get_full(self):
+        args = self._parse(["tasks", "get", "abc123", "--full"])
+        self.assertTrue(args.full)
+
+    def test_tasks_get_rejects_conflicting_output_flags(self):
+        with self.assertRaises(SystemExit) as ctx:
+            self._parse(["tasks", "get", "abc123", "--fields", "id", "--full"])
+        self.assertEqual(ctx.exception.code, 2)
+
     def test_tasks_get_rejects_conflicting_comment_flags(self):
         with self.assertRaises(SystemExit) as ctx:
             self._parse(["tasks", "get", "abc123", "--no-comments", "--all-comments"])
@@ -807,6 +820,21 @@ class ParserComprehensiveTests(unittest.TestCase):
         args = self._parse(["tasks", "create", "--space", "staging", "--name", "Bug"])
         self.assertEqual(args.command, "create")
         self.assertEqual(args.name, "Bug")
+
+    def test_tasks_create_accepts_repeatable_tags(self):
+        args = self._parse([
+            "tasks",
+            "create",
+            "--space",
+            "staging",
+            "--name",
+            "Bug",
+            "--tag",
+            "Urgent",
+            "--tag",
+            "In Review",
+        ])
+        self.assertEqual(args.tags, ["Urgent", "In Review"])
 
     def test_tasks_update(self):
         args = self._parse(["tasks", "update", "abc123", "--status", "done"])

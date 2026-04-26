@@ -4,7 +4,7 @@ import sys
 
 import requests
 
-from ...helpers import fetch_all_comments
+from ...helpers import fetch_all_comments, filter_task_fields, format_tasks
 from .shared import (
     DEFAULT_TASK_PAGE_BUDGET,
     _TASK_ID_PATTERN,
@@ -12,6 +12,7 @@ from .shared import (
     _filter_by_tags,
     _format_and_wrap,
     _paginate_tasks,
+    _parse_fields,
     _parse_search_custom_fields,
     _resolve_list_id,
     _resolve_scope_list_ids,
@@ -62,6 +63,11 @@ def cmd_tasks_get(client, args):
     task = client.get_v2(f"/task/{args.task_id}")
 
     if getattr(args, "no_comments", False):
+        fields = _parse_fields(args)
+        if fields:
+            return filter_task_fields(task, fields)
+        if getattr(args, "full", False):
+            return format_tasks([task], full=True)[0]
         return task
 
     try:
@@ -91,6 +97,12 @@ def cmd_tasks_get(client, args):
         task["comment_count_returned"] = 0
         task["comments_complete"] = False
         task["comments_truncated"] = False
+
+    fields = _parse_fields(args)
+    if fields:
+        return filter_task_fields(task, fields)
+    if getattr(args, "full", False):
+        return format_tasks([task], full=True)[0]
 
     return task
 

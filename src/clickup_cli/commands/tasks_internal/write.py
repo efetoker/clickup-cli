@@ -124,6 +124,7 @@ def cmd_tasks_create(client, args):
         _parse_custom_field(raw)
         for raw in (getattr(args, "custom_fields", None) or [])
     ]
+    tags = [tag.lower() for tag in (getattr(args, "tags", None) or [])]
 
     task_type = None
     raw_task_type = getattr(args, "task_type", None)
@@ -132,7 +133,7 @@ def cmd_tasks_create(client, args):
         body["custom_item_id"] = task_type["id"]
 
     if client.dry_run:
-        if custom_fields or task_type:
+        if custom_fields or task_type or tags:
             return {
                 "dry_run": True,
                 "action": "create_task",
@@ -141,6 +142,7 @@ def cmd_tasks_create(client, args):
                     {"field_id": field_id, "value": value}
                     for field_id, value in custom_fields
                 ],
+                "post_create_tags": tags,
                 "task_type": task_type,
                 "space": args.space,
                 "list_id": list_id,
@@ -157,7 +159,10 @@ def cmd_tasks_create(client, args):
     for field_id, value in custom_fields:
         client.post_v2(f"/task/{result['id']}/field/{field_id}", data={"value": value})
 
-    if custom_fields:
+    for tag in tags:
+        client.post_v2(f"/task/{result['id']}/tag/{tag}", data={})
+
+    if custom_fields or tags:
         return client.get_v2(f"/task/{result['id']}")
 
     return result

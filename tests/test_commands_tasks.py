@@ -104,6 +104,42 @@ class TasksGetTests(unittest.TestCase):
         self.assertFalse(result["comments_truncated"])
         self.assertEqual(result["comments"], [])
 
+    def test_get_fields_filters_hydrated_task(self):
+        client = MagicMock()
+        client.dry_run = False
+        client.get_v2.side_effect = [
+            {"id": "t1", "name": "Task", "status": {"status": "open"}},
+            {"comments": []},
+        ]
+        args = Namespace(
+            task_id="t1",
+            no_comments=False,
+            all_comments=False,
+            fields="id,name,comment_count",
+            full=False,
+        )
+
+        result = cmd_tasks_get(client, args)
+
+        self.assertEqual(result, {"id": "t1", "name": "Task", "comment_count": 0})
+
+    def test_get_full_no_comments_returns_raw_task(self):
+        client = MagicMock()
+        client.dry_run = False
+        client.get_v2.return_value = {"id": "t1", "name": "Task", "extra": "kept"}
+        args = Namespace(
+            task_id="t1",
+            no_comments=True,
+            all_comments=False,
+            fields=None,
+            full=True,
+        )
+
+        result = cmd_tasks_get(client, args)
+
+        self.assertEqual(result, {"id": "t1", "name": "Task", "extra": "kept"})
+        client.get_v2.assert_called_once()
+
 
 class TasksMoveTests(unittest.TestCase):
 
@@ -338,11 +374,11 @@ class TasksCreateBehaviorTests(unittest.TestCase):
 
     def _make_args(self, **overrides):
         defaults = dict(space="testspace", list_id=None, name="Task",
-                         desc=None, desc_file=None,
-                         priority=None, status=None, assign_user=None,
-                         start_date=None, due_date=None,
-                         time_estimate=None, points=None,
-                         custom_fields=None, task_type=None)
+                          desc=None, desc_file=None,
+                          priority=None, status=None, assign_user=None,
+                          start_date=None, due_date=None,
+                          time_estimate=None, points=None,
+                          custom_fields=None, task_type=None, tags=None)
         defaults.update(overrides)
         return Namespace(**defaults)
 
@@ -468,6 +504,37 @@ class TasksCreateBehaviorTests(unittest.TestCase):
                 "/list/222/task",
                 "/task/task-1/field/field-1",
                 "/task/task-1/field/field-2",
+                "/task/task-1",
+            ],
+        )
+
+    def test_create_tags_dry_run_shows_post_create_plan(self):
+        client = FlexClient(dry_run=True)
+
+        result = cmd_tasks_create(client, self._make_args(tags=["Urgent", "In Review"]))
+
+        self.assertEqual(result["action"], "create_task")
+        self.assertEqual(result["create_body"], {"name": "Task"})
+        self.assertEqual(result["post_create_tags"], ["urgent", "in review"])
+        self.assertEqual(client.calls, [])
+
+    def test_create_tags_live_posts_after_create_and_fetches_final_task(self):
+        client = FlexClient(
+            responses={
+                "/list/222/task": {"id": "task-1", "name": "Task"},
+                "/task/task-1": {"id": "task-1", "name": "Task", "tags": []},
+            }
+        )
+
+        result = cmd_tasks_create(client, self._make_args(tags=["Urgent", "In Review"]))
+
+        self.assertEqual(result["id"], "task-1")
+        self.assertEqual(
+            [call["path"] for call in client.calls],
+            [
+                "/list/222/task",
+                "/task/task-1/tag/urgent",
+                "/task/task-1/tag/in review",
                 "/task/task-1",
             ],
         )

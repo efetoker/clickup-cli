@@ -179,6 +179,8 @@ returns:
 
 examples:
   clickup tasks get abc123
+  clickup tasks get abc123 --fields id,name,status,url
+  clickup tasks get abc123 --full --no-comments
   clickup --pretty tasks get abc123
   clickup tasks get abc123 --no-comments""",
     )
@@ -193,6 +195,17 @@ examples:
         "--all-comments",
         action="store_true",
         help="Fetch every comment page instead of the default bounded slice",
+    )
+    output_shape = tg.add_mutually_exclusive_group()
+    output_shape.add_argument(
+        "--fields",
+        type=str,
+        help="Comma-separated list of fields to return (e.g. id,name,status,url)",
+    )
+    output_shape.add_argument(
+        "--full",
+        action="store_true",
+        help="Return the full task payload explicitly (default behavior for tasks get)",
     )
 
     # tasks create
@@ -230,6 +243,7 @@ examples:
   clickup tasks create --space <name> --name "Kickoff" --start-date 2026-04-21 --due-date 2026-04-24
   clickup tasks create --space <name> --name "Estimate" --time-estimate 90m --points 3
   clickup tasks create --space <name> --name "Bug" --custom-field field-1=high --task-type type-1
+  clickup tasks create --space <name> --name "Bug" --tag urgent --tag backend
 
 notes:
   Provide either --space or --list.
@@ -238,6 +252,7 @@ notes:
   --desc and --desc-file are mutually exclusive. Using both is an error.
   --assign assigns the task to a user ID.
   --custom-field uses FIELD_ID=VALUE and is repeatable.
+  --tag is repeatable, auto-lowercased, and applied after task creation.
   --task-type accepts a task/custom item type ID from `task-types list`.
   Does not support: checklists or attachments.""",
     )
@@ -304,6 +319,12 @@ notes:
         action="append",
         metavar="FIELD_ID=VALUE",
         help="Custom field to set after create (repeatable, format: field_uuid=value)",
+    )
+    tc.add_argument(
+        "--tag",
+        dest="tags",
+        action="append",
+        help="Tag to apply after create (repeatable, auto-lowercased)",
     )
     tc.add_argument(
         "--task-type",
