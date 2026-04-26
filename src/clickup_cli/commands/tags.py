@@ -245,6 +245,7 @@ def cmd_tags_usage(client, args):
     """Audit task usage for a Space-level tag."""
     tag_name = args.tag.lower()
     include_archived = getattr(args, "include_archived", False)
+    space_id = resolve_space_id(args.space, spaces=client.runtime.spaces)
     list_ids = _resolve_scope_list_ids(
         client,
         args.space,
@@ -257,7 +258,22 @@ def cmd_tags_usage(client, args):
             include_archived=True,
             allow_empty=True,
         )
-        list_ids = list(dict.fromkeys(list_ids + archived_list_ids))
+        active_folder_response = client.get_v2(
+            f"/space/{space_id}/folder", allow_dry_run=True
+        )
+        archived_active_folder_list_ids = []
+        for folder in active_folder_response.get("folders", []):
+            folder_lists_response = client.get_v2(
+                f"/folder/{folder['id']}/list",
+                params={"archived": "true"},
+                allow_dry_run=True,
+            )
+            archived_active_folder_list_ids.extend(
+                item["id"] for item in folder_lists_response.get("lists", [])
+            )
+        list_ids = list(
+            dict.fromkeys(list_ids + archived_list_ids + archived_active_folder_list_ids)
+        )
 
     params = {"archived": "false"}
     if getattr(args, "include_closed", False):

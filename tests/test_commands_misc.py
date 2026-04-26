@@ -222,6 +222,70 @@ class TagsUsageTests(unittest.TestCase):
         self.assertEqual({task["id"] for task in result["tasks"]}, {"active", "archived"})
         self.assertEqual(result["count"], 2)
 
+    def test_usage_include_archived_scans_archived_lists_inside_active_folders(self):
+        def _space_folder(path, kwargs):
+            if (kwargs.get("params") or {}).get("archived") == "true":
+                return {"folders": [{"id": "archived-folder"}]}
+            return {"folders": [{"id": "active-folder"}]}
+
+        def _space_list(path, kwargs):
+            if (kwargs.get("params") or {}).get("archived") == "true":
+                return {"lists": [{"id": "archived-folderless"}]}
+            return {"lists": [{"id": "active-folderless"}]}
+
+        def _active_folder_list(path, kwargs):
+            if (kwargs.get("params") or {}).get("archived") == "true":
+                return {"lists": [{"id": "archived-in-active-folder"}]}
+            return {"lists": [{"id": "active-in-active-folder"}]}
+
+        def _archived_folder_list(path, kwargs):
+            return {"lists": [{"id": "archived-in-archived-folder"}]}
+
+        def _tasks(path, kwargs):
+            list_id = path.split("/")[2]
+            archived = (kwargs.get("params") or {}).get("archived")
+            if archived == "true" or list_id.startswith("archived-"):
+                return {
+                    "tasks": [
+                        {
+                            "id": f"task-{list_id}",
+                            "name": list_id,
+                            "url": f"url-{list_id}",
+                            "status": {"status": "open"},
+                            "tags": [{"name": "urgent"}],
+                        }
+                    ],
+                    "last_page": True,
+                }
+            return {"tasks": [], "last_page": True}
+
+        client = FlexClient(
+            responses={
+                "/space/111/list": _space_list,
+                "/space/111/folder": _space_folder,
+                "/folder/active-folder/list": _active_folder_list,
+                "/folder/archived-folder/list": _archived_folder_list,
+                "/list/": _tasks,
+            }
+        )
+        args = Namespace(
+            space="testspace",
+            tag="urgent",
+            include_closed=False,
+            include_archived=True,
+            subtasks=False,
+            all_pages=True,
+        )
+
+        result = tags_commands.cmd_tags_usage(client, args)
+
+        self.assertIn(
+            {"method": "GET", "path": "/folder/active-folder/list", "params": {"archived": "true"}, "allow_dry_run": True},
+            client.calls,
+        )
+        self.assertIn("task-archived-in-active-folder", {task["id"] for task in result["tasks"]})
+        self.assertEqual(result["lists_scanned"], 5)
+
 
 # ─── Team ─────────────────────────────────────────────────────────────────
 
