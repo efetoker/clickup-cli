@@ -163,16 +163,64 @@ class TagsUsageTests(unittest.TestCase):
 
         tags_commands.cmd_tags_usage(client, args)
 
-        task_call = next(call for call in client.calls if call["path"] == "/list/list-1/task")
+        task_calls = [call for call in client.calls if call["path"] == "/list/list-1/task"]
         self.assertEqual(
-            task_call["params"],
-            {
-                "archived": "true",
-                "include_closed": "true",
-                "subtasks": "true",
-                "page": "0",
-            },
+            [call["params"] for call in task_calls],
+            [
+                {
+                    "archived": "false",
+                    "include_closed": "true",
+                    "subtasks": "true",
+                    "page": "0",
+                },
+                {
+                    "archived": "true",
+                    "include_closed": "true",
+                    "subtasks": "true",
+                    "page": "0",
+                },
+            ],
         )
+
+    def test_usage_include_archived_merges_active_and_archived_tasks(self):
+        def _tasks(path, kwargs):
+            archived = kwargs.get("params", {}).get("archived")
+            if archived == "true":
+                return {
+                    "tasks": [
+                        {"id": "archived", "name": "Archived", "url": "u2", "status": {"status": "open"}, "tags": [{"name": "urgent"}]}
+                    ],
+                    "last_page": True,
+                }
+            return {
+                "tasks": [
+                    {"id": "active", "name": "Active", "url": "u1", "status": {"status": "open"}, "tags": [{"name": "urgent"}]}
+                ],
+                "last_page": True,
+            }
+
+        client = FlexClient(
+            responses={
+                "/space/111/list": {"lists": [{"id": "list-1"}]},
+                "/space/111/folder": {"folders": []},
+                "/list/list-1/task": _tasks,
+            }
+        )
+        args = Namespace(
+            space="testspace",
+            tag="urgent",
+            include_closed=False,
+            include_archived=True,
+            subtasks=False,
+            all_pages=False,
+        )
+
+        result = tags_commands.cmd_tags_usage(client, args)
+
+        task_calls = [call for call in client.calls if call["path"] == "/list/list-1/task"]
+        self.assertEqual({call["params"]["archived"] for call in task_calls}, {"false", "true"})
+        self.assertEqual({task["id"] for task in result["tasks"]}, {"active", "archived"})
+        self.assertEqual(result["count"], 2)
 
 
 # ─── Team ─────────────────────────────────────────────────────────────────

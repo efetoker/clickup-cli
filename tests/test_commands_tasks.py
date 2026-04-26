@@ -1240,6 +1240,28 @@ class TasksBulkTests(unittest.TestCase):
         self.assertEqual(result["plan"]["tasks"][0]["operations"][0]["tag"], "urgent")
         self.assertEqual(client.calls, [])
 
+    def test_bulk_tags_rejects_invalid_plan_before_dry_run(self):
+        client = FlexClient(dry_run=True)
+        invalid_plans = [
+            {"tasks": [{"operations": [{"action": "add", "tag": "urgent"}]}]},
+            {"tasks": [{"task_id": "a", "operations": [{"action": "add"}]}]},
+            {"tasks": [{"task_id": "a", "operations": [{"action": "rename", "tag": "urgent"}]}]},
+        ]
+
+        for plan in invalid_plans:
+            with self.subTest(plan=plan):
+                with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+                    json.dump(plan, handle)
+                    handle.flush()
+
+                    with self.assertRaises(SystemExit):
+                        tasks_commands.cmd_tasks_bulk(
+                            client,
+                            Namespace(subcommand="tags", plan_file=handle.name, continue_on_error=False),
+                        )
+
+        self.assertEqual(client.calls, [])
+
     def test_bulk_tags_preserves_operation_order(self):
         client = FlexClient()
         plan = {

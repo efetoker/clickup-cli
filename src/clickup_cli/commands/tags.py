@@ -244,13 +244,22 @@ def cmd_tags_delete(client, args):
 def cmd_tags_usage(client, args):
     """Audit task usage for a Space-level tag."""
     tag_name = args.tag.lower()
+    include_archived = getattr(args, "include_archived", False)
     list_ids = _resolve_scope_list_ids(
         client,
         args.space,
-        include_archived=getattr(args, "include_archived", False),
-        allow_empty=True,
+        allow_empty=include_archived,
     )
-    params = {"archived": "true" if getattr(args, "include_archived", False) else "false"}
+    if include_archived:
+        archived_list_ids = _resolve_scope_list_ids(
+            client,
+            args.space,
+            include_archived=True,
+            allow_empty=True,
+        )
+        list_ids = list(dict.fromkeys(list_ids + archived_list_ids))
+
+    params = {"archived": "false"}
     if getattr(args, "include_closed", False):
         params["include_closed"] = "true"
     if getattr(args, "subtasks", False):
@@ -265,6 +274,13 @@ def cmd_tags_usage(client, args):
         all_tasks.extend(result["tasks"])
         pages_fetched += result["pages_fetched"]
         complete = complete and result["complete"]
+        if include_archived:
+            archived_params = dict(params)
+            archived_params["archived"] = "true"
+            result = _paginate_tasks(client, f"/list/{list_id}/task", archived_params, budget=budget)
+            all_tasks.extend(result["tasks"])
+            pages_fetched += result["pages_fetched"]
+            complete = complete and result["complete"]
 
     matching = _filter_by_tags(all_tasks, [tag_name])
     tasks = [compact_task(task) for task in matching]

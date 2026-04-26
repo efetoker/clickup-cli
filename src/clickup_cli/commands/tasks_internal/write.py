@@ -340,11 +340,27 @@ def _load_bulk_tag_plan(plan_file):
     with open(plan_file, encoding="utf-8") as handle:
         plan = json.load(handle)
     normalized_tasks = []
-    for task in plan.get("tasks", []):
-        operations = [
-            {"action": op.get("action"), "tag": op.get("tag", "").lower()}
-            for op in task.get("operations", [])
-        ]
+    for task_index, task in enumerate(plan.get("tasks", []), start=1):
+        task_id = task.get("task_id")
+        if not task_id:
+            error(f"Invalid bulk tag plan: task #{task_index} is missing task_id")
+
+        operations = []
+        for op_index, op in enumerate(task.get("operations", []), start=1):
+            action = op.get("action")
+            if action not in {"add", "remove"}:
+                error(
+                    f"Invalid bulk tag plan: task {task_id} operation #{op_index} "
+                    f"has invalid action: {action}"
+                )
+
+            tag = op.get("tag", "")
+            if not tag:
+                error(
+                    f"Invalid bulk tag plan: task {task_id} operation #{op_index} "
+                    "is missing tag"
+                )
+            operations.append({"action": action, "tag": tag.lower()})
         normalized_tasks.append({"task_id": task.get("task_id"), "operations": operations})
     return {"tasks": normalized_tasks}
 
