@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.8.0 (2026-04-26)
+
 - **Task output shaping and tagging workflows expanded.** `tasks get` now accepts `--fields` and `--full` alongside comment hydration flags, and `tasks create` supports repeatable `--tag` values applied after creation.
 - **Migration and safety workflows are broader.** New `tasks bulk move` and `tasks bulk tags` commands provide dry-run-friendly bulk operations with resume-oriented failure output, while `lists backup`, `folders backup`, enriched delete dry-runs, and `folders purge-empty` add safer hierarchy cleanup paths.
 - **Space tag management is now first-class.** `tags create`, `tags delete`, and `tags usage` cover Space-level tag lifecycle and usage auditing, including archived-list coverage fixes.
