@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Task output shaping and tagging workflows expanded.** `tasks get` now accepts `--fields` and `--full` alongside comment hydration flags, and `tasks create` supports repeatable `--tag` values applied after creation.
+- **Migration and safety workflows are broader.** New `tasks bulk move` and `tasks bulk tags` commands provide dry-run-friendly bulk operations with resume-oriented failure output, while `lists backup`, `folders backup`, enriched delete dry-runs, and `folders purge-empty` add safer hierarchy cleanup paths.
+- **Space tag management is now first-class.** `tags create`, `tags delete`, and `tags usage` cover Space-level tag lifecycle and usage auditing, including archived-list coverage fixes.
+- **API resilience and destructive safety were tightened.** Safe GET requests retry transient 502/503/504 responses without changing 429 behavior, and bulk/tag/destructive validation now rejects unsafe or empty plans earlier.
+
 ## 1.7.0 (2026-04-20)
 
 - **Metadata discovery and custom-field lookup are easier to drive from the CLI.** New discovery flows cover field and task-type metadata, and task search can now target custom fields directly instead of forcing clients to pre-resolve everything out of band.

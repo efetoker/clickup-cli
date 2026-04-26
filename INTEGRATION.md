@@ -12,8 +12,8 @@
 ## Output Modes
 
 - Default task list and search output is compact
-- `--fields` returns only the requested fields
-- `--full` returns full task objects with normalized status metadata
+- `--fields` returns only the requested fields on task list/search/get flows
+- `--full` returns full task objects with normalized status metadata where applicable
 
 ## Bounded Defaults
 
@@ -32,4 +32,9 @@
 
 - Validate response metadata instead of assuming a default scan is exhaustive
 - Use `--dry-run` before automating mutations in a new environment
+- Use `tasks bulk ...` and backup commands for migration workflows that need resumable failure output or local JSON snapshots
 - Treat doc IDs and page IDs as different values
+
+## Reliability
+
+- Safe GET requests retry transient 502/503/504 responses; 429 rate-limit handling remains explicit and separate

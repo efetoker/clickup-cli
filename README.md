@@ -79,15 +79,15 @@ Output is JSON on stdout; errors go to stderr.
 | Group | Subcommands | Description |
 |-------|-------------|-------------|
 | `init` | — | Interactive workspace setup |
-| `tasks` | list, get, create, update, search, delete, move, merge, lists, add-to-list, remove-from-list, depend, link | Full task CRUD + memberships, links, and dependencies |
+| `tasks` | list, get, create, update, search, delete, move, merge, bulk, lists, add-to-list, remove-from-list, depend, link | Full task CRUD + memberships, links, dependencies, and migration-safe bulk operations |
 | `comments` | list, add, update, delete, thread, reply | Full comment CRUD with threading |
 | `docs` | list, get, create, pages, get-page, edit-page, create-page | Docs and page management |
 | `fields` | list | Custom field discovery for list or space scope |
-| `folders` | list, get, create, update, delete, privacy | Folder CRUD + privacy toggle |
-| `lists` | list, get, create, update, delete, privacy | List CRUD + privacy toggle |
+| `folders` | list, get, create, update, delete, backup, purge-empty, privacy | Folder CRUD + backups, guarded empty-folder purge, and privacy toggle |
+| `lists` | list, get, create, update, delete, backup, privacy | List CRUD + backups and privacy toggle |
 | `spaces` | list, get, create, update, delete, statuses, privacy | Full space CRUD + statuses + privacy toggle |
 | `team` | whoami, members | Workspace and member info |
-| `tags` | list, add, remove | Tag management |
+| `tags` | list, create, delete, usage, add, remove | Space tag lifecycle, usage audit, and task tag management |
 | `task-types` | list | Workspace custom task type discovery |
 
 Use `clickup <group> <command> --help` for detailed usage, examples, and return format.
@@ -112,7 +112,7 @@ clickup tasks list --space <name> --pretty
 
 - **Flag aliases** — every positional argument also accepts a `--flag` form. `tasks get abc123` and `tasks get --task-id abc123` are equivalent. Same for `--query`, `--doc-id`, `--page-id`, `--folder-id`, `--list-id`, `--comment-id`, `--space`.
 - **Raw numeric IDs** on `--space` and `--folder` flags are accepted transparently alongside config aliases. On tasks commands, list-bound commands may resolve a raw space ID to its first folderless list via one API call.
-- **`tasks create`** auto-infers `--space` from `--list` via API lookup. You can omit `--space` if `--list` is provided, and create also supports start/due dates, time estimates, points, repeatable `--custom-field` values, and `--task-type`.
+- **`tasks create`** auto-infers `--space` from `--list` via API lookup. You can omit `--space` if `--list` is provided, and create also supports start/due dates, time estimates, points, repeatable `--custom-field` values, repeatable `--tag` values, and `--task-type`.
 - **`tasks update`** handles core fields, assignee diffs (`--add-assignee` / `--remove-assignee`), tag diffs (`--add-tag` / `--remove-tag`), and custom fields (`--custom-field FIELD_ID=VALUE`) in one call. All flags are repeatable; `--dry-run` returns a structured plan.
 - **`tasks lists` / `tasks add-to-list` / `tasks remove-from-list`** let you inspect and manage multi-list task membership separately from home-list moves.
 - **`tasks link`** manages non-blocking linked-task relationships; use `tasks depend` for blocking dependencies.
@@ -121,8 +121,12 @@ clickup tasks list --space <name> --pretty
 - **`tasks list` / `tasks search --include-archived`** — second paginated call with `archived=true`, merged into the default results. Since ClickUp's `archived` param is a filter, this is the only way to see both in one command.
 - **`tasks list` / `tasks search` bounded defaults** — by default, these commands fetch a bounded aggregate scan and return `pages_fetched`, `results_complete`, and `results_truncated`. Use `--all-pages` for an exhaustive scan.
 - **`tasks list --full` / `tasks search --full`** return full task objects with a normalized `status` dict shape (`{status, color, type, orderindex}`), not just the compact projection.
-- **`tasks get`** auto-fetches comments and appends them to the output. By default this is a bounded slice and the response includes `comment_count_returned`, `comments_complete`, and `comments_truncated`. Use `--all-comments` for exhaustive comment hydration or `--no-comments` to skip it.
+- **`tasks get`** auto-fetches comments and appends them to the output. By default this is a bounded slice and the response includes `comment_count_returned`, `comments_complete`, and `comments_truncated`. Use `--fields` to select specific task fields, `--full` to request the full task payload explicitly, `--all-comments` for exhaustive comment hydration, or `--no-comments` to skip it.
 - **`tasks search`** auto-detects task ID patterns like `PROJ-39` and applies prefix filtering.
+- **`tasks bulk move` / `tasks bulk tags`** provide dry-run-friendly batch migration flows with resume-oriented failure details.
+- **`lists backup` / `folders backup`** write local JSON backups with safety-first defaults before migration or deletion; `folders purge-empty` only deletes after exhaustive empty-folder proof.
+- **Space tag lifecycle** — `tags create`, `tags delete`, and `tags usage` manage and audit Space-level tags; task-level `tags add` / `tags remove` remain available.
+- **GET retries** — transient ClickUp 502/503/504 responses are retried only for safe GET requests; 429 rate-limit handling remains separate.
 - **`docs edit-page --append`** reads the current page content, appends your new content, and sends one update.
 - **Tag names** are auto-lowercased (ClickUp API stores them lowercase regardless of UI display).
 - **Doc ID ≠ page ID.** Always use `docs pages <doc_id>` to discover page IDs before using `get-page` or `edit-page`.
