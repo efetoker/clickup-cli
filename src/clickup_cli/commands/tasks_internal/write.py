@@ -339,14 +339,24 @@ def _tasks_bulk_move(client, args):
 def _load_bulk_tag_plan(plan_file):
     with open(plan_file, encoding="utf-8") as handle:
         plan = json.load(handle)
+    tasks = plan.get("tasks") if isinstance(plan, dict) else None
+    if not isinstance(tasks, list) or not tasks:
+        error("Invalid bulk tag plan: tasks must be a non-empty list")
+
     normalized_tasks = []
-    for task_index, task in enumerate(plan.get("tasks", []), start=1):
+    for task_index, task in enumerate(tasks, start=1):
         task_id = task.get("task_id")
         if not task_id:
             error(f"Invalid bulk tag plan: task #{task_index} is missing task_id")
 
+        raw_operations = task.get("operations")
+        if not isinstance(raw_operations, list) or not raw_operations:
+            error(
+                f"Invalid bulk tag plan: task {task_id} operations must be a non-empty list"
+            )
+
         operations = []
-        for op_index, op in enumerate(task.get("operations", []), start=1):
+        for op_index, op in enumerate(raw_operations, start=1):
             action = op.get("action")
             if action not in {"add", "remove"}:
                 error(

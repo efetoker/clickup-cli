@@ -1243,7 +1243,13 @@ class TasksBulkTests(unittest.TestCase):
     def test_bulk_tags_rejects_invalid_plan_before_dry_run(self):
         client = FlexClient(dry_run=True)
         invalid_plans = [
+            {},
+            {"tasks": []},
+            {"tasks": "a"},
             {"tasks": [{"operations": [{"action": "add", "tag": "urgent"}]}]},
+            {"tasks": [{"task_id": "a"}]},
+            {"tasks": [{"task_id": "a", "operations": []}]},
+            {"tasks": [{"task_id": "a", "operations": "add"}]},
             {"tasks": [{"task_id": "a", "operations": [{"action": "add"}]}]},
             {"tasks": [{"task_id": "a", "operations": [{"action": "rename", "tag": "urgent"}]}]},
         ]
