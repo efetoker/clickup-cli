@@ -1,7 +1,7 @@
 """Folder command handlers — list, get, create, update, delete, privacy."""
 
 from ..helpers import error, resolve_space_id, add_id_argument
-from .backup import backup_list, backup_options, count_folder_tasks, write_json
+from .backup import backup_list, backup_options, count_folder_tasks, folder_child_lists, write_json
 from .privacy import handle_privacy_request, register_privacy_subcommand
 
 
@@ -311,7 +311,7 @@ def cmd_folders_backup(client, args):
     task_count = 0
     complete = True
     list_manifests = []
-    for child_list in folder.get("lists", []):
+    for child_list in folder_child_lists(client, folder, include_archived=options["include_archived"]):
         list_id = child_list["id"]
         list_ids.append(list_id)
         list_manifest = backup_list(

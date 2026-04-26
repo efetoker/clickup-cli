@@ -208,17 +208,17 @@ class TransientRetryTests(ClientSetupMixin, unittest.TestCase):
         mock_sleep.assert_called_once_with(0.25)
 
     @patch("time.sleep")
-    def test_delete_retries_transient_504_then_succeeds(self, mock_sleep):
+    def test_delete_does_not_retry_transient_504(self, mock_sleep):
         client = self._make_client()
         transient = self._mock_response(504, ok=False, text="Gateway Timeout")
-        success = self._mock_response(204, ok=True, text="")
-        client.session.request = MagicMock(side_effect=[transient, success])
+        transient.json.side_effect = ValueError
+        client.session.request = MagicMock(return_value=transient)
 
-        result = client.delete_v2("/test")
+        with self.assertRaises(SystemExit):
+            client.delete_v2("/test")
 
-        self.assertEqual(result, {})
-        self.assertEqual(client.session.request.call_count, 2)
-        mock_sleep.assert_called_once_with(0.25)
+        client.session.request.assert_called_once()
+        mock_sleep.assert_not_called()
 
     @patch("time.sleep")
     def test_get_exhausts_transient_retries_then_errors(self, mock_sleep):
@@ -256,6 +256,7 @@ class TransientRetryTests(ClientSetupMixin, unittest.TestCase):
         for caller in (
             lambda client: client.post_v2("/test", data={"x": 1}),
             lambda client: client.put_v2("/test", data={"x": 1}),
+            lambda client: client.delete_v2("/test"),
             lambda client: client.patch_v3("/test", data={"x": 1}),
         ):
             client = self._make_client()

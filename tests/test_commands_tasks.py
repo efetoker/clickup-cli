@@ -1246,10 +1246,12 @@ class TasksBulkTests(unittest.TestCase):
             {},
             {"tasks": []},
             {"tasks": "a"},
+            {"tasks": ["a"]},
             {"tasks": [{"operations": [{"action": "add", "tag": "urgent"}]}]},
             {"tasks": [{"task_id": "a"}]},
             {"tasks": [{"task_id": "a", "operations": []}]},
             {"tasks": [{"task_id": "a", "operations": "add"}]},
+            {"tasks": [{"task_id": "a", "operations": ["add"]}]},
             {"tasks": [{"task_id": "a", "operations": [{"action": "add"}]}]},
             {"tasks": [{"task_id": "a", "operations": [{"action": "rename", "tag": "urgent"}]}]},
         ]

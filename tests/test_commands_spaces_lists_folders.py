@@ -119,6 +119,33 @@ class FoldersDeleteTests(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["action"], "deleted")
 
+    def test_delete_dry_run_counts_archived_lists_inside_active_folder(self):
+        client = FlexClient(
+            dry_run=True,
+            responses={
+                "/folder/f1/list": {"lists": [{"id": "archived-list", "name": "Archived"}]},
+                "/folder/f1": {"id": "f1", "name": "Archive", "lists": [{"id": "active-list", "name": "Active"}]},
+                "/list/active-list/task": {"tasks": [], "last_page": True},
+                "/list/archived-list/task": {"tasks": [{"id": "archived-task"}], "last_page": True},
+            },
+        )
+
+        result = cmd_folders_delete(client, Namespace(folder_id="f1"))
+
+        self.assertEqual(result["task_counts"]["total"], 1)
+        self.assertEqual(result["task_counts"]["task_ids"], ["archived-task"])
+        self.assertEqual(
+            [call for call in client.calls if call["path"] == "/folder/f1/list"],
+            [
+                {
+                    "method": "GET",
+                    "path": "/folder/f1/list",
+                    "params": {"archived": "true"},
+                    "allow_dry_run": True,
+                }
+            ],
+        )
+
 
 class FoldersBackupTests(unittest.TestCase):
 
@@ -152,6 +179,47 @@ class FoldersBackupTests(unittest.TestCase):
         self.assertEqual(manifest["task_count"], 1)
         self.assertIn("lists/l1/tasks/t1.json", manifest["files"])
 
+    def test_backup_includes_archived_lists_inside_active_folder(self):
+        client = FlexClient(
+            responses={
+                "/folder/f1/list": {"lists": [{"id": "archived-list", "name": "Archived"}]},
+                "/folder/f1": {"id": "f1", "name": "Archive", "lists": [{"id": "active-list", "name": "Active"}]},
+                "/list/active-list/task": {"tasks": [], "last_page": True},
+                "/list/archived-list/task": {"tasks": [{"id": "archived-task"}], "last_page": True},
+                "/task/archived-task/comment": {"comments": [], "last_page": True},
+                "/task/archived-task": {"id": "archived-task", "name": "Archived task"},
+                "/list/active-list": {"id": "active-list", "name": "Active"},
+                "/list/archived-list": {"id": "archived-list", "name": "Archived"},
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = Namespace(
+                folder_id="f1",
+                output_dir=tmpdir,
+                no_closed=False,
+                no_archived=False,
+                no_subtasks=False,
+                first_page=False,
+                no_comments=False,
+            )
+            cmd_folders_backup(client, args)
+            manifest = json.loads(Path(tmpdir, "manifest.json").read_text())
+
+        self.assertEqual(manifest["list_ids"], ["active-list", "archived-list"])
+        self.assertEqual(manifest["task_ids"], ["archived-task"])
+        self.assertEqual(
+            [call for call in client.calls if call["path"] == "/folder/f1/list"],
+            [
+                {
+                    "method": "GET",
+                    "path": "/folder/f1/list",
+                    "params": {"archived": "true"},
+                    "allow_dry_run": True,
+                }
+            ],
+        )
+
 
 class FoldersPurgeEmptyTests(unittest.TestCase):
 
@@ -183,6 +251,30 @@ class FoldersPurgeEmptyTests(unittest.TestCase):
         self.assertEqual(result["action"], "purge_empty_folder")
         self.assertTrue(result["deletable"])
         self.assertEqual(result["task_counts"]["total"], 0)
+
+    def test_purge_empty_refuses_archived_list_tasks_inside_active_folder(self):
+        client = FlexClient(
+            responses={
+                "/folder/f1/list": {"lists": [{"id": "archived-list", "name": "Archived"}]},
+                "/folder/f1": {"id": "f1", "name": "Archive", "lists": []},
+                "/list/archived-list/task": {"tasks": [{"id": "archived-task"}], "last_page": True},
+            }
+        )
+
+        with self.assertRaises(SystemExit):
+            cmd_folders_purge_empty(client, Namespace(folder_id="f1"))
+
+        self.assertEqual(
+            [call for call in client.calls if call["path"] == "/folder/f1/list"],
+            [
+                {
+                    "method": "GET",
+                    "path": "/folder/f1/list",
+                    "params": {"archived": "true"},
+                    "allow_dry_run": True,
+                }
+            ],
+        )
 
 
 class FoldersPrivacyTests(unittest.TestCase):

@@ -130,7 +130,7 @@ def count_folder_tasks(client, folder):
     task_ids = []
     complete = True
     pages_fetched = 0
-    for child_list in folder.get("lists", []):
+    for child_list in folder_child_lists(client, folder, include_archived=True):
         count = count_list_tasks(client, child_list["id"])
         list_counts.append({"list_id": child_list["id"], **count})
         total += count["total"]
@@ -144,3 +144,19 @@ def count_folder_tasks(client, folder):
         "pages_fetched": pages_fetched,
         "complete": complete,
     }
+
+
+def folder_child_lists(client, folder, include_archived=False):
+    """Return folder child lists, optionally adding archived lists not in metadata."""
+    child_lists = list(folder.get("lists", []))
+    if include_archived and folder.get("id"):
+        archived_response = client.get_v2(
+            f"/folder/{folder['id']}/list",
+            params={"archived": "true"},
+            allow_dry_run=True,
+        )
+        child_lists.extend(archived_response.get("lists", []))
+    deduped = {}
+    for child_list in child_lists:
+        deduped.setdefault(child_list["id"], child_list)
+    return list(deduped.values())

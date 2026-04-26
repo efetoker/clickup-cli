@@ -14,7 +14,7 @@ class ClickUpClient:
     BASE_V2 = "https://api.clickup.com/api/v2"
     BASE_V3 = "https://api.clickup.com/api/v3"
     TRANSIENT_RETRY_STATUSES = {502, 503, 504}
-    TRANSIENT_RETRY_METHODS = {"GET", "DELETE"}
+    TRANSIENT_RETRY_METHODS = {"GET"}
     TRANSIENT_RETRY_ATTEMPTS = 3
     TRANSIENT_RETRY_BACKOFF_SECONDS = 0.25
 

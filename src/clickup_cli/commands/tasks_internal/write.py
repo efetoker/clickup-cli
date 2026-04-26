@@ -345,6 +345,8 @@ def _load_bulk_tag_plan(plan_file):
 
     normalized_tasks = []
     for task_index, task in enumerate(tasks, start=1):
+        if not isinstance(task, dict):
+            error(f"Invalid bulk tag plan: task #{task_index} must be an object")
         task_id = task.get("task_id")
         if not task_id:
             error(f"Invalid bulk tag plan: task #{task_index} is missing task_id")
@@ -357,6 +359,11 @@ def _load_bulk_tag_plan(plan_file):
 
         operations = []
         for op_index, op in enumerate(raw_operations, start=1):
+            if not isinstance(op, dict):
+                error(
+                    f"Invalid bulk tag plan: task {task_id} operation #{op_index} "
+                    "must be an object"
+                )
             action = op.get("action")
             if action not in {"add", "remove"}:
                 error(
