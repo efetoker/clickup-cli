@@ -774,6 +774,50 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.command, "remove")
         self.assertEqual(args.tag, "draft")
 
+    def test_tags_create_space_tag(self):
+        args = self._parse([
+            "tags",
+            "create",
+            "--space",
+            "dev",
+            "--tag",
+            "Urgent",
+            "--fg-color",
+            "#ffffff",
+            "--bg-color",
+            "#ff0000",
+        ])
+        self.assertEqual(args.command, "create")
+        self.assertEqual(args.space, "dev")
+        self.assertEqual(args.tag, "Urgent")
+        self.assertEqual(args.fg_color, "#ffffff")
+        self.assertEqual(args.bg_color, "#ff0000")
+
+    def test_tags_delete_space_tag(self):
+        args = self._parse(["tags", "delete", "--space", "dev", "--tag", "In Review"])
+        self.assertEqual(args.command, "delete")
+        self.assertEqual(args.space, "dev")
+        self.assertEqual(args.tag, "In Review")
+
+    def test_tags_usage(self):
+        args = self._parse([
+            "tags",
+            "usage",
+            "--space",
+            "dev",
+            "--tag",
+            "Urgent",
+            "--include-closed",
+            "--include-archived",
+            "--subtasks",
+            "--all-pages",
+        ])
+        self.assertEqual(args.command, "usage")
+        self.assertTrue(args.include_closed)
+        self.assertTrue(args.include_archived)
+        self.assertTrue(args.subtasks)
+        self.assertTrue(args.all_pages)
+
     # --- tasks (additional to existing) ---
 
     def test_tasks_list(self):

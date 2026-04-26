@@ -9,6 +9,7 @@ import requests
 
 from clickup_cli.commands.docs import cmd_docs_create
 from clickup_cli.commands.init import cmd_init
+from clickup_cli.commands import tags as tags_commands
 from clickup_cli.commands.tags import cmd_tags_add, cmd_tags_list, cmd_tags_remove
 from clickup_cli.commands.team import cmd_team_members, cmd_team_whoami
 
@@ -56,6 +57,122 @@ class TagsRemoveTests(unittest.TestCase):
         args = Namespace(task_id="t1", tag="draft")
         result = cmd_tags_remove(client, args)
         self.assertTrue(result["dry_run"])
+
+
+class TagsLifecycleTests(unittest.TestCase):
+
+    def test_create_space_tag_dry_run(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(space="testspace", tag="Urgent", fg_color="#fff", bg_color="#f00")
+
+        result = tags_commands.cmd_tags_create(client, args)
+
+        self.assertEqual(result["action"], "create_space_tag")
+        self.assertEqual(result["space_id"], "111")
+        self.assertEqual(result["tag"], "urgent")
+        self.assertEqual(
+            result["body"],
+            {"tag": {"name": "urgent", "tag_fg": "#fff", "tag_bg": "#f00"}},
+        )
+        self.assertEqual(client.calls, [])
+
+    def test_create_space_tag_live_posts_body(self):
+        client = FlexClient(responses={"/space/111/tag": {"tag": {"name": "urgent"}}})
+        args = Namespace(space="testspace", tag="Urgent", fg_color=None, bg_color=None)
+
+        result = tags_commands.cmd_tags_create(client, args)
+
+        self.assertEqual(result, {"tag": {"name": "urgent"}})
+        self.assertEqual(client.calls[0]["method"], "POST")
+        self.assertEqual(client.calls[0]["path"], "/space/111/tag")
+        self.assertEqual(client.calls[0]["data"], {"tag": {"name": "urgent"}})
+
+    def test_delete_space_tag_dry_run_warns_blast_radius(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(space="testspace", tag="In Review")
+
+        result = tags_commands.cmd_tags_delete(client, args)
+
+        self.assertEqual(result["action"], "delete_space_tag")
+        self.assertEqual(result["tag"], "in review")
+        self.assertEqual(result["encoded_tag"], "in%20review")
+        self.assertIn("all tasks in this Space", result["warning"])
+        self.assertEqual(client.calls, [])
+
+    def test_delete_space_tag_live_uses_encoded_path(self):
+        client = FlexClient()
+        args = Namespace(space="testspace", tag="In Review")
+
+        result = tags_commands.cmd_tags_delete(client, args)
+
+        self.assertEqual(result["action"], "space_tag_deleted")
+        self.assertEqual(client.calls[0]["method"], "DELETE")
+        self.assertEqual(client.calls[0]["path"], "/space/111/tag/in%20review")
+
+
+class TagsUsageTests(unittest.TestCase):
+
+    def test_usage_scans_space_tasks_with_bounded_default(self):
+        client = FlexClient(
+            responses={
+                "/space/111/list": {"lists": [{"id": "list-1"}]},
+                "/space/111/folder": {"folders": []},
+                "/list/list-1/task": {
+                    "tasks": [
+                        {"id": "t1", "name": "Match", "url": "u1", "status": {"status": "open"}, "tags": [{"name": "urgent"}]},
+                        {"id": "t2", "name": "Skip", "url": "u2", "status": {"status": "open"}, "tags": []},
+                    ],
+                    "last_page": True,
+                },
+            }
+        )
+        args = Namespace(
+            space="testspace",
+            tag="Urgent",
+            include_closed=False,
+            include_archived=False,
+            subtasks=False,
+            all_pages=False,
+        )
+
+        result = tags_commands.cmd_tags_usage(client, args)
+
+        self.assertEqual(result["tag"], "urgent")
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["tasks"][0]["id"], "t1")
+        self.assertEqual(result["lists_scanned"], 1)
+        self.assertEqual(result["pages_fetched"], 1)
+        self.assertTrue(result["results_complete"])
+
+    def test_usage_exhaustive_flags_forward_to_task_scan(self):
+        client = FlexClient(
+            responses={
+                "/space/111/list": {"lists": [{"id": "list-1"}]},
+                "/space/111/folder": {"folders": []},
+                "/list/list-1/task": {"tasks": [], "last_page": True},
+            }
+        )
+        args = Namespace(
+            space="testspace",
+            tag="urgent",
+            include_closed=True,
+            include_archived=True,
+            subtasks=True,
+            all_pages=True,
+        )
+
+        tags_commands.cmd_tags_usage(client, args)
+
+        task_call = next(call for call in client.calls if call["path"] == "/list/list-1/task")
+        self.assertEqual(
+            task_call["params"],
+            {
+                "archived": "true",
+                "include_closed": "true",
+                "subtasks": "true",
+                "page": "0",
+            },
+        )
 
 
 # ─── Team ─────────────────────────────────────────────────────────────────
