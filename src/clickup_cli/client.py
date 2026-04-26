@@ -13,6 +13,10 @@ from .runtime import RuntimeContext
 class ClickUpClient:
     BASE_V2 = "https://api.clickup.com/api/v2"
     BASE_V3 = "https://api.clickup.com/api/v3"
+    TRANSIENT_RETRY_STATUSES = {502, 503, 504}
+    TRANSIENT_RETRY_METHODS = {"GET", "DELETE"}
+    TRANSIENT_RETRY_ATTEMPTS = 3
+    TRANSIENT_RETRY_BACKOFF_SECONDS = 0.25
 
     def __init__(self, token, dry_run=False, debug=False, runtime=None):
         self.token = token
@@ -71,6 +75,21 @@ class ClickUpClient:
                 print(f"Rate limited (429), waiting {wait}s...", file=sys.stderr)
                 time.sleep(wait)
                 response = _do_request()
+
+        attempt = 1
+        while (
+            method in self.TRANSIENT_RETRY_METHODS
+            and response.status_code in self.TRANSIENT_RETRY_STATUSES
+            and attempt < self.TRANSIENT_RETRY_ATTEMPTS
+        ):
+            attempt += 1
+            self._log(
+                f"  retrying transient {response.status_code} "
+                f"(attempt {attempt}/{self.TRANSIENT_RETRY_ATTEMPTS})"
+            )
+            time.sleep(self.TRANSIENT_RETRY_BACKOFF_SECONDS)
+            response = _do_request()
+            self._log(f"  → {response.status_code} ({len(response.text)} bytes)")
 
         if response.status_code == 401:
             error(

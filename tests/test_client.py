@@ -191,6 +191,102 @@ class ErrorHandlingTests(ClientSetupMixin, unittest.TestCase):
             client.get_v2("/test")
 
 
+class TransientRetryTests(ClientSetupMixin, unittest.TestCase):
+    """Tests for bounded transient retry behavior."""
+
+    @patch("time.sleep")
+    def test_get_retries_transient_502_then_succeeds(self, mock_sleep):
+        client = self._make_client()
+        transient = self._mock_response(502, ok=False, text="Bad Gateway")
+        success = self._mock_response(200, ok=True, text='{"ok": true}')
+        client.session.request = MagicMock(side_effect=[transient, success])
+
+        result = client.get_v2("/test")
+
+        self.assertEqual(result, {"ok": True})
+        self.assertEqual(client.session.request.call_count, 2)
+        mock_sleep.assert_called_once_with(0.25)
+
+    @patch("time.sleep")
+    def test_delete_retries_transient_504_then_succeeds(self, mock_sleep):
+        client = self._make_client()
+        transient = self._mock_response(504, ok=False, text="Gateway Timeout")
+        success = self._mock_response(204, ok=True, text="")
+        client.session.request = MagicMock(side_effect=[transient, success])
+
+        result = client.delete_v2("/test")
+
+        self.assertEqual(result, {})
+        self.assertEqual(client.session.request.call_count, 2)
+        mock_sleep.assert_called_once_with(0.25)
+
+    @patch("time.sleep")
+    def test_get_exhausts_transient_retries_then_errors(self, mock_sleep):
+        client = self._make_client()
+        responses = [
+            self._mock_response(503, ok=False, text="Unavailable"),
+            self._mock_response(503, ok=False, text="Unavailable"),
+            self._mock_response(503, ok=False, text="Unavailable"),
+        ]
+        for response in responses:
+            response.json.side_effect = ValueError
+        client.session.request = MagicMock(side_effect=responses)
+
+        with self.assertRaises(SystemExit):
+            client.get_v2("/test")
+
+        self.assertEqual(client.session.request.call_count, 3)
+        self.assertEqual(mock_sleep.call_count, 2)
+
+    @patch("time.sleep")
+    def test_non_transient_400_is_not_retried(self, mock_sleep):
+        client = self._make_client()
+        response = self._mock_response(400, ok=False, text="Bad Request")
+        response.json.side_effect = ValueError
+        client.session.request = MagicMock(return_value=response)
+
+        with self.assertRaises(SystemExit):
+            client.get_v2("/test")
+
+        client.session.request.assert_called_once()
+        mock_sleep.assert_not_called()
+
+    @patch("time.sleep")
+    def test_unsafe_mutations_do_not_retry_transient_responses(self, mock_sleep):
+        for caller in (
+            lambda client: client.post_v2("/test", data={"x": 1}),
+            lambda client: client.put_v2("/test", data={"x": 1}),
+            lambda client: client.patch_v3("/test", data={"x": 1}),
+        ):
+            client = self._make_client()
+            response = self._mock_response(502, ok=False, text="Bad Gateway")
+            response.json.side_effect = ValueError
+            client.session.request = MagicMock(return_value=response)
+
+            with self.assertRaises(SystemExit):
+                caller(client)
+
+            client.session.request.assert_called_once()
+        mock_sleep.assert_not_called()
+
+    @patch("time.sleep")
+    def test_transient_retry_debug_logging(self, mock_sleep):
+        client = self._make_client(debug=True)
+        transient = self._mock_response(502, ok=False, text="Bad Gateway")
+        success = self._mock_response(200, ok=True, text='{"ok": true}')
+        client.session.request = MagicMock(side_effect=[transient, success])
+
+        captured = io.StringIO()
+        old_stderr = sys.stderr
+        sys.stderr = captured
+        try:
+            client.get_v2("/test")
+        finally:
+            sys.stderr = old_stderr
+
+        self.assertIn("retrying transient 502", captured.getvalue())
+
+
 class DryRunTests(ClientSetupMixin, unittest.TestCase):
     """Tests for dry-run behavior."""
 
