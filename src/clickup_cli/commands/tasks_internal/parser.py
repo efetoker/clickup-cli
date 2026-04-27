@@ -340,8 +340,9 @@ notes:
         description="""\
 Update one or more fields on an existing task. This is a mutating command.
 
-Core fields are sent in one PUT request: --name, --status, --priority,
---desc / --desc-file, plus assignee diffs (--add-assignee / --remove-assignee).
+Core fields are sent in one PUT request: --name, --status, --priority
+(or --clear-priority), --desc / --desc-file, plus assignee diffs
+(--add-assignee / --remove-assignee).
 
 Tag changes run as extra POST/DELETE calls (one per tag) because the
 ClickUp API handles tags on a per-task endpoint.
@@ -365,6 +366,7 @@ returns:
 examples:
   clickup tasks update abc123 --name "Renamed task"
   clickup tasks update abc123 --status "complete"
+  clickup tasks update abc123 --clear-priority
   clickup tasks update abc123 --add-tag "in review" --remove-tag "draft"
   clickup tasks update abc123 --add-assignee 12345 --remove-assignee 67890
   clickup tasks update abc123 --custom-field abc-uuid=high --custom-field xyz-uuid=42
@@ -372,6 +374,7 @@ examples:
 
 notes:
   --desc and --desc-file are mutually exclusive. Using both is an error.
+  --priority and --clear-priority are mutually exclusive. Using both is an error.
   Tag names are auto-lowercased.
   --custom-field values are sent as strings; the ClickUp API coerces
   them to the field's declared type.""",
@@ -379,8 +382,14 @@ notes:
     add_id_argument(tu, "task_id", "ClickUp task ID to update")
     tu.add_argument("--name", type=str, help="New task name")
     tu.add_argument("--status", type=str, help="New status (space-specific)")
-    tu.add_argument(
+    priority_update = tu.add_mutually_exclusive_group()
+    priority_update.add_argument(
         "--priority", type=str, help="Priority: urgent, high, normal, low (or 1-4)"
+    )
+    priority_update.add_argument(
+        "--clear-priority",
+        action="store_true",
+        help="Clear the task priority by sending priority: null",
     )
     tu.add_argument(
         "--desc",

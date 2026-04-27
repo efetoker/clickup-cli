@@ -134,6 +134,23 @@ class CliArgumentTests(unittest.TestCase):
 
         self.assertEqual(args.custom_fields, ["field-1=high", "field-2=42"])
 
+    def test_tasks_update_parser_accepts_clear_priority(self):
+        parser = cli.build_parser()
+
+        args = parser.parse_args(["tasks", "update", "t1", "--clear-priority"])
+
+        self.assertTrue(args.clear_priority)
+
+    def test_tasks_update_parser_rejects_priority_with_clear_priority(self):
+        parser = cli.build_parser()
+
+        with self.assertRaises(SystemExit) as ctx:
+            parser.parse_args(
+                ["tasks", "update", "t1", "--priority", "high", "--clear-priority"]
+            )
+
+        self.assertEqual(ctx.exception.code, 2)
+
     def test_tasks_link_add_parser_accepts_flag_aliases(self):
         parser = cli.build_parser()
 

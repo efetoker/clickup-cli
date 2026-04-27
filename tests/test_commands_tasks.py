@@ -270,10 +270,33 @@ class TasksUpdateBehaviorTests(unittest.TestCase):
     def test_update_priority(self):
         client = FlexClient(responses={"/task/": {"id": "t1"}})
         args = Namespace(task_id="t1", name=None, status=None,
-                         desc=None, desc_file=None, priority="high")
+                         desc=None, desc_file=None, priority="high",
+                         clear_priority=False)
         cmd_tasks_update(client, args)
         body = client.calls[-1]["data"]
         self.assertEqual(body["priority"], 2)
+
+    def test_update_clear_priority_dry_run_sets_null_priority(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(task_id="t1", name=None, status=None,
+                         desc=None, desc_file=None, priority=None,
+                         clear_priority=True)
+
+        result = cmd_tasks_update(client, args)
+
+        self.assertIsNone(result["put_body"]["priority"])
+        self.assertEqual(client.calls, [])
+
+    def test_update_clear_priority_live_sends_null_priority(self):
+        client = FlexClient(responses={"/task/": {"id": "t1"}})
+        args = Namespace(task_id="t1", name=None, status=None,
+                         desc=None, desc_file=None, priority=None,
+                         clear_priority=True)
+
+        cmd_tasks_update(client, args)
+
+        body = client.calls[-1]["data"]
+        self.assertIsNone(body["priority"])
 
     def test_update_empty_body_errors(self):
         client = FlexClient()

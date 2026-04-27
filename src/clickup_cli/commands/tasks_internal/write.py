@@ -197,6 +197,8 @@ def cmd_tasks_update(client, args):
         body["markdown_description"] = desc
     if args.priority:
         body["priority"] = _resolve_priority(args.priority)
+    if getattr(args, "clear_priority", False):
+        body["priority"] = None
 
     add_assignees = [int(user_id) for user_id in (getattr(args, "add_assignees", None) or [])]
     rem_assignees = [int(user_id) for user_id in (getattr(args, "remove_assignees", None) or [])]
@@ -213,8 +215,8 @@ def cmd_tasks_update(client, args):
     if not body and not add_tags and not remove_tags and not custom_fields:
         error(
             "Nothing to update — provide at least one of: --name, --status, --desc, "
-            "--desc-file, --priority, --add-assignee, --remove-assignee, --add-tag, "
-            "--remove-tag, --custom-field"
+            "--desc-file, --priority, --clear-priority, --add-assignee, "
+            "--remove-assignee, --add-tag, --remove-tag, --custom-field"
         )
 
     plan = {
