@@ -24,13 +24,14 @@ Current suite shape:
 - `tests/test_command_manifest.py` — manifest-derived registration and handlers
 - `tests/test_commands_tasks.py` — task commands and task-specific behavior
 - `tests/test_commands_docs_comments.py` — docs and comments commands
+- `tests/test_commands_metadata.py` — fields and task-types metadata commands
 - `tests/test_commands_spaces_lists_folders.py` — spaces, lists, folders, privacy
 - `tests/test_commands_misc.py` — tags, team, init, misc dispatch coverage
 - `tests/test_config.py` — config loading and fallback rules
 - `tests/test_helpers.py` — stdout/stderr helpers, task formatting, pagination helpers
 - `tests/test_tasks_facade.py` — task facade exports
 
-At the time of writing, `pytest --collect-only -q` collects 397 tests.
+Use `pytest --collect-only -q` when you need the current collection count.
 
 ## Linting
 

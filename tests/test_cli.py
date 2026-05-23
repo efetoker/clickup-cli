@@ -104,6 +104,16 @@ class CliArgumentTests(unittest.TestCase):
         self.assertEqual(args.group, "init")
         self.assertEqual(args.token, "pk_test123")
 
+    def test_init_help_documents_alias_generation(self):
+        parser = cli.build_parser()
+        init_parser = parser._subparsers._group_actions[0].choices["init"]
+
+        help_text = " ".join(init_parser.format_help().split())
+
+        self.assertIn("lowercasing space names", help_text)
+        self.assertIn("replacing spaces with hyphens", help_text)
+        self.assertIn("does not store default list IDs", help_text)
+
     def test_parser_registers_metadata_groups(self):
         parser = cli.build_parser()
 
@@ -150,6 +160,39 @@ class CliArgumentTests(unittest.TestCase):
             )
 
         self.assertEqual(ctx.exception.code, 2)
+
+    def test_tasks_create_priority_help_matches_behavior(self):
+        parser = cli.build_parser()
+        tasks_parser = parser._subparsers._group_actions[0].choices["tasks"]
+        create_parser = tasks_parser._subparsers._group_actions[0].choices["create"]
+
+        help_text = " ".join(create_parser.format_help().split())
+
+        self.assertIn("only sent when specified", help_text)
+        self.assertNotIn("default: from config", help_text)
+
+    def test_root_help_lists_all_tag_subcommands(self):
+        help_text = cli.build_parser().format_help()
+
+        self.assertIn("tags      — list, create, delete, usage, add, remove", help_text)
+
+    def test_root_help_documents_positional_flag_aliases(self):
+        help_text = cli.build_parser().format_help()
+
+        self.assertIn("Positional IDs also accept --flag aliases", help_text)
+        self.assertIn("--task-id", help_text)
+        self.assertIn("--doc-id", help_text)
+
+    def test_task_pagination_help_documents_default_page_budget(self):
+        parser = cli.build_parser()
+        tasks_parser = parser._subparsers._group_actions[0].choices["tasks"]
+        task_subcommands = tasks_parser._subparsers._group_actions[0].choices
+
+        list_help = " ".join(task_subcommands["list"].format_help().split())
+        search_help = " ".join(task_subcommands["search"].format_help().split())
+
+        self.assertIn("default: up to 2 pages", list_help)
+        self.assertIn("default: up to 2 pages", search_help)
 
     def test_tasks_link_add_parser_accepts_flag_aliases(self):
         parser = cli.build_parser()

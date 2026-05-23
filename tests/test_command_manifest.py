@@ -1,5 +1,7 @@
 """Regression coverage for command manifests."""
 
+import os
+import subprocess
 import unittest
 
 
@@ -45,6 +47,24 @@ class CommandManifestTests(unittest.TestCase):
         self.assertIn("docs_create-page", HANDLERS)
         self.assertIn("fields_list", HANDLERS)
         self.assertIn("task-types_list", HANDLERS)
+
+    def test_validate_cli_output_checks_manifest_groups(self):
+        script_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "scripts",
+            "validate-cli-output.sh",
+        )
+
+        result = subprocess.run(
+            ["bash", script_path],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Checking: clickup fields --help", result.stdout)
+        self.assertIn("Checking: clickup task-types --help", result.stdout)
 
 
 if __name__ == "__main__":

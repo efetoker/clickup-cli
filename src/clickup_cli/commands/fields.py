@@ -62,6 +62,26 @@ examples:
         "list",
         formatter_class=F,
         help="List custom fields in scope",
+        description="""\
+List custom fields for one ClickUp list.
+
+Use --list to inspect a specific list directly. If --list is omitted, --space
+resolves to the configured default list for that space; if no default list is
+configured, the CLI uses the first folderless list returned by ClickUp.
+
+The response includes fields, count, and scope. The scope object reports the
+requested space/list and the resolved list ID that was inspected.""",
+        epilog="""\
+examples:
+  clickup fields list --space <name>
+  clickup fields list --list 12345
+
+returns:
+  {"fields": [...], "count": N, "scope": {"resolved_list_id": "..."}}
+
+notes:
+  Folder-contained list fields require --list because the --space fallback
+  can only inspect the configured default list or first folderless list.""",
     )
     list_parser.add_argument("--space", type=str, help="Space name or raw ID")
     list_parser.add_argument(

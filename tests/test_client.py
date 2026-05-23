@@ -115,6 +115,16 @@ class RuntimeContextTests(ClientSetupMixin, unittest.TestCase):
         self.assertIs(client.runtime, runtime)
 
 
+class ClientDocumentationTests(unittest.TestCase):
+    def test_request_docstring_covers_retry_and_rate_limit_behavior(self):
+        doc = ClickUpClient._request.__doc__ or ""
+
+        self.assertIn("allow_dry_run", doc)
+        self.assertIn("429", doc)
+        self.assertIn("low remaining", doc)
+        self.assertIn("502/503/504", doc)
+
+
 class RateLimitTests(ClientSetupMixin, unittest.TestCase):
     """Tests for _check_rate_limit behavior."""
 

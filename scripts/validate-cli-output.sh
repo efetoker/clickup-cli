@@ -21,8 +21,17 @@ else
     fail "clickup --help failed"
 fi
 
-# 2. All command groups and their subcommands
-CMD_GROUPS=(tasks comments docs folders lists spaces team tags)
+# 2. All manifest-registered command groups and their subcommands
+CMD_GROUPS=()
+while IFS= read -r group; do
+    CMD_GROUPS+=("$group")
+done < <(python3 - <<'PY'
+from clickup_cli.commands import COMMAND_MANIFESTS
+
+for manifest in COMMAND_MANIFESTS:
+    print(manifest["group"])
+PY
+)
 
 for group in "${CMD_GROUPS[@]}"; do
     echo "Checking: clickup $group --help"

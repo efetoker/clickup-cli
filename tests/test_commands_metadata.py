@@ -123,6 +123,38 @@ class MetadataParserTests(unittest.TestCase):
         self.assertEqual(task_types_args.command, "list")
         self.assertEqual(task_types_args.list_id, "12345")
 
+    def test_fields_list_help_documents_scope_resolution(self):
+        from clickup_cli.commands.fields import register_parser as register_fields_parser
+
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="group")
+        register_fields_parser(subparsers, argparse.RawDescriptionHelpFormatter)
+        fields_parser = subparsers.choices["fields"]
+        list_parser = fields_parser._subparsers._group_actions[0].choices["list"]
+
+        help_text = " ".join(list_parser.format_help().split())
+
+        self.assertIn("configured default list", help_text)
+        self.assertIn("first folderless list", help_text)
+        self.assertIn("scope", help_text)
+
+    def test_task_types_list_help_documents_workspace_scope(self):
+        from clickup_cli.commands.task_types import (
+            register_parser as register_task_types_parser,
+        )
+
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="group")
+        register_task_types_parser(subparsers, argparse.RawDescriptionHelpFormatter)
+        task_types_parser = subparsers.choices["task-types"]
+        list_parser = task_types_parser._subparsers._group_actions[0].choices["list"]
+
+        help_text = " ".join(list_parser.format_help().split())
+
+        self.assertIn("workspace-scoped", help_text)
+        self.assertIn("scope_applied", help_text)
+        self.assertIn("false", help_text)
+
 
 if __name__ == "__main__":
     unittest.main()

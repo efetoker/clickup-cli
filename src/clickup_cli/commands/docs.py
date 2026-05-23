@@ -97,10 +97,13 @@ Optionally provide initial content via --content or --content-file.
 If content is provided, it is written to the auto-created default page
 automatically — no need for a separate edit-page call.
 
-Use --dry-run to preview the request body without creating the doc.
+Use --dry-run to preview the create-doc body without creating the doc. When
+initial content is provided, the preview also includes the default-page write
+that would run after the doc is created.
 Global flags may appear before or after the command group:
   clickup --dry-run docs create --space <name> --name "My doc"
-  clickup --dry-run docs create --space 12345 --name "My doc""",
+  clickup --dry-run docs create --space 12345 --name "My doc"
+""",
         epilog="""\
 returns:
   The created doc object from the API. If content was written, includes
@@ -350,7 +353,13 @@ def cmd_docs_create(client, args):
         body["visibility"] = args.visibility
 
     if client.dry_run:
-        return {"dry_run": True, "action": "create_doc", "body": body}
+        preview = {"dry_run": True, "action": "create_doc", "body": body}
+        if content:
+            preview["post_create_page_write"] = {
+                "target": "auto-created default page",
+                "body": {"content": content, "content_format": "text/md"},
+            }
+        return preview
 
     doc = client.post_v3(f"/workspaces/{client.runtime.workspace_id}/docs", data=body)
 

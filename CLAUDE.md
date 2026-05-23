@@ -14,6 +14,7 @@ src/clickup_cli/
 ├── helpers.py       # output(), error(), compact_task(), add_id_argument(), etc.
 └── commands/
     ├── __init__.py  # COMMAND_MANIFESTS registry + derived HANDLERS map
+    ├── backup.py    # shared backup helpers used by list/folder backups
     ├── tasks.py     # compatibility facade for tasks entrypoints
     ├── tasks_internal/
     │   ├── parser.py   # tasks parser registration
@@ -22,10 +23,13 @@ src/clickup_cli/
     │   └── shared.py   # task-scoped resolution helpers
     ├── comments.py  # comments parser + handlers (list/add/update/delete/thread/reply)
     ├── docs.py      # docs parser + handlers (list/get/create/pages/get-page/edit-page/create-page)
-    ├── folders.py   # folders parser + handlers (list/get/create/update/delete/privacy)
-    ├── lists.py     # lists parser + handlers (list/get/create/update/delete/privacy)
-    ├── spaces.py    # spaces parser + handlers (list/get/statuses/privacy)
-    ├── tags.py      # tags parser + handlers (list/add/remove)
+    ├── fields.py    # custom field metadata discovery
+    ├── folders.py   # folders parser + handlers (list/get/create/update/delete/backup/purge-empty/privacy)
+    ├── lists.py     # lists parser + handlers (list/get/create/update/delete/backup/privacy)
+    ├── privacy.py   # shared privacy toggle helpers
+    ├── spaces.py    # spaces parser + handlers (list/get/create/update/delete/statuses/privacy)
+    ├── tags.py      # tags parser + handlers (list/create/delete/usage/add/remove)
+    ├── task_types.py # workspace custom task type discovery
     ├── team.py      # team parser + handlers (whoami/members)
     └── init.py      # clickup init setup command
 ```
@@ -73,6 +77,7 @@ tests/
 ├── test_command_manifest.py               # manifest registry + derived handlers
 ├── test_commands_tasks.py                 # task command handlers
 ├── test_commands_docs_comments.py         # docs/comments handlers
+├── test_commands_metadata.py              # fields/task-types handlers
 ├── test_commands_spaces_lists_folders.py  # spaces/lists/folders handlers
 ├── test_commands_misc.py                  # tags/team/init coverage
 ├── test_tasks_facade.py                   # tasks facade -> tasks_internal regression coverage
@@ -88,14 +93,11 @@ GitHub Actions (`ci.yml`): lint + test on Python 3.9, 3.11, 3.13. Runs on push t
 
 ## Adding a New Command
 
-1. Create or extend a file in `src/clickup_cli/commands/`
-2. Add or update that group's `COMMAND_MANIFEST` (`group`, `register_parser`, `handlers`)
-3. If it's a new command group, import its manifest in `commands/__init__.py` and add it to `COMMAND_MANIFESTS`
-4. For `tasks`, keep the public facade in `commands/tasks.py` and put parser/read/write internals in `commands/tasks_internal/` when extending the split structure
-5. Add detailed `--help` text (description + epilog with examples)
-6. Mutating commands must support `--dry-run`
-7. All output goes to stdout as JSON, errors to stderr
-8. Add tests in the relevant split test module under `tests/`
+The canonical human workflow lives in [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-new-command). Keep this section focused on repo-local agent reminders:
+
+1. Follow the manifest pattern; do not hand-edit the derived `HANDLERS` map.
+2. For `tasks`, keep the public facade in `commands/tasks.py` and put parser/read/write internals in `commands/tasks_internal/` when extending the split structure.
+3. Add self-sufficient help text and update the relevant split test module under `tests/`.
 
 ## Rules
 

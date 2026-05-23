@@ -332,6 +332,21 @@ class DocsCreateTests(unittest.TestCase):
         self.assertTrue(result["dry_run"])
         self.assertEqual(result["body"]["name"], "Doc")
 
+    def test_dry_run_with_content_shows_page_write_plan(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(space="testspace", name="Doc", content="# Hello",
+                         content_file=None, visibility=None)
+
+        result = cmd_docs_create(client, args)
+
+        self.assertEqual(
+            result["post_create_page_write"],
+            {
+                "target": "auto-created default page",
+                "body": {"content": "# Hello", "content_format": "text/md"},
+            },
+        )
+
     def test_dry_run_accepts_raw_space_id(self):
         client = FlexClient(dry_run=True)
         args = Namespace(space="111", name="Doc", content=None,
@@ -364,6 +379,7 @@ class DocsCreateTests(unittest.TestCase):
         help_text = create_parser.format_help()
 
         self.assertIn("SPACE_NAME_OR_ID", help_text)
+        self.assertIn('clickup --dry-run docs create --space 12345 --name "My doc"', help_text)
 
 
 class DocsPagesTests(unittest.TestCase):

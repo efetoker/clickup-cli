@@ -28,6 +28,24 @@ examples:
         "list",
         formatter_class=F,
         help="List workspace custom task types",
+        description="""\
+List workspace-scoped custom task types.
+
+The ClickUp endpoint is workspace-scoped. --space and --list are accepted for
+workflow consistency and echoed in the response scope, but they do not filter
+or narrow the returned task types.""",
+        epilog="""\
+examples:
+  clickup task-types list
+  clickup task-types list --space <name>
+  clickup task-types list --list 12345
+
+returns:
+  {"task_types": [...], "count": N, "scope_applied": false}
+
+notes:
+  scope_applied is always false because task types come from the workspace
+  custom item type endpoint.""",
     )
     list_parser.add_argument("--space", type=str, help="Space name or raw ID")
     list_parser.add_argument(

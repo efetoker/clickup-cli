@@ -1,6 +1,6 @@
 ---
 name: clickup-cli
-description: Use the clickup CLI to manage ClickUp tasks, comments, docs, folders, lists, spaces, and tags from the command line. JSON output, dry-run support.
+description: Use the clickup CLI to manage ClickUp tasks, comments, docs, folders, lists, spaces, tags, custom fields, and task types from the command line. JSON output, dry-run support.
 ---
 
 # ClickUp CLI Skill
@@ -48,6 +48,17 @@ clickup --dry-run tasks create --space <space_name> --name "Fix auth" --desc "De
 clickup tasks create --space <space_name> --name "Fix auth" --desc "Details"
 clickup tasks create --list <list_id> --name "Fix auth" --desc "Details"
 ```
+
+### Discover custom fields and task types
+```bash
+clickup fields list --space <space_name>          # returns fields, count, scope
+clickup fields list --list <list_id>              # use for folder-contained lists
+clickup task-types list                           # workspace-level task types
+```
+`fields list --space` inspects the configured default list for that space, or
+the first folderless list if no default `list_id` is configured. `task-types
+list` is workspace-scoped; any `--space` or `--list` value is echoed for
+workflow context but does not filter the API result (`scope_applied: false`).
 
 ### Update a task (including tags, assignees, custom fields)
 ```bash
@@ -115,5 +126,6 @@ Use `clickup init` for interactive setup. For config file shape, resolution orde
 - `tasks get` auto-fetches comments (use `--no-comments` to skip)
 - `tasks search` auto-detects task ID patterns (e.g. "PROJ-39") and applies prefix filtering
 - `tasks create` accepts `--space` or `--list`; when only `--list` is provided, the CLI auto-infers the matching configured space alias before resolving the target list
+- Use `fields list` before `--custom-field FIELD_ID=VALUE` flows, and `task-types list` before `--task-type` flows
 - Tag names are auto-lowercased (ClickUp API requirement)
 - Doc ID ≠ page ID — always use `docs pages` to find page IDs first

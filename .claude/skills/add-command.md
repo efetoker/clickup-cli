@@ -5,77 +5,24 @@ description: Step-by-step workflow for adding a new CLI command to clickup-cli, 
 
 # Add a New CLI Command
 
-Follow these steps in order when adding a new command or subcommand.
+`CONTRIBUTING.md#adding-a-new-command` is the canonical workflow. Follow it first; keep this skill as an agent-focused reminder instead of a second source of truth.
 
-## 1. Create or extend the command module
+## Agent Reminders
 
-- If this is a new command group, create `src/clickup_cli/commands/<group>.py`
-- If extending an existing group, add the handler function to the existing file
-- For `tasks`, keep `src/clickup_cli/commands/tasks.py` as the public facade and put new parser/read/write internals under `src/clickup_cli/commands/tasks_internal/` when appropriate
-- Handler signature: `def cmd_<group>_<command>(client, args):`
-- Return a dict (will be output as JSON)
-- Mutating commands must check `client.dry_run` and return a dry-run preview instead of calling the API
+- Use `src/clickup_cli/commands/<group>.py` for the parser and handlers, except `tasks`, which keeps parser/read/write internals under `src/clickup_cli/commands/tasks_internal/` behind the public facade.
+- Expose or update `COMMAND_MANIFEST`; new groups must be imported into `COMMAND_MANIFESTS` in `src/clickup_cli/commands/__init__.py`.
+- Do not hand-edit `HANDLERS`; it is derived from manifests.
+- Use `add_id_argument()` for positional IDs so both positional and `--flag` forms work.
+- Make `--help` self-sufficient with examples, return-shape notes, and dry-run guidance for mutating commands.
+- Add focused tests in the relevant split test module under `tests/`; use `tests/test_commands_metadata.py` for `fields` and `task-types`.
+- If the command adds a new workflow pattern, update `.claude/skills/clickup-cli.md` with a usage example.
 
-## 2. Add or extend the parser in the same module
+## Verification
 
-- Each command module owns its parser via `register_parser(subparsers, F)`
-- If extending an existing group, add the new subparser inside the existing `register_parser()`
-- If creating a new group, expose a `COMMAND_MANIFEST` with `group`, `register_parser`, and `handlers`
-- Add the subparser with:
-  - `description=` — what this command does
-  - `epilog=` — usage examples (at least 2)
-  - `formatter_class=F` (passed in as argument)
-- Add all arguments with `help=` text
-- For mutating commands, `--dry-run` is handled globally (no per-command flag needed)
-
-## 3. Register the handler
-
-- Open `src/clickup_cli/commands/__init__.py`
-- Update the owning module's `COMMAND_MANIFEST["handlers"]`
-- For new command groups, import the group's `COMMAND_MANIFEST` and add it to `COMMAND_MANIFESTS`
-- Do not hand-edit `HANDLERS`; it is derived from the manifests
-
-## 3b. Root parser wiring
-
-- `cli.py` already iterates `COMMAND_MANIFESTS`
-- New groups become available once their manifest is added to `src/clickup_cli/commands/__init__.py`
-
-## 4. Write help text
-
-- The `--help` output must be self-sufficient for an agent to use the command correctly
-- Include concrete examples in the epilog
-- Never use real workspace IDs, space names, or tokens in examples — use `<placeholders>`
-
-## 5. Add tests
-
-- Update the relevant split test module in `tests/`:
-- `tests/test_cli.py` for parser/dispatch behavior
-- `tests/test_command_manifest.py` for manifest wiring changes
-- `tests/test_tasks_facade.py` when changing the tasks facade/tasks_internal split
-- `tests/test_commands_<group>.py` or the nearest shared command-family test file for handler coverage
-- Test argument parsing (parser accepts the new args)
-- Test dry-run behavior (mutating commands return dry-run preview)
-- Test core logic with `FakeClient`
-
-## 6. Verify
-
-Run these commands and confirm all pass before considering the work done:
+Run the standard contributor checks from `CONTRIBUTING.md`:
 
 ```bash
-# Lint
-ruff check src/ tests/
-
-# Tests
 pytest -v
-
-# Help text renders correctly
-clickup <group> <command> --help
-
-# Validate CLI output contract
+ruff check src/ tests/
 scripts/validate-cli-output.sh
 ```
-
-## 7. Update the skill (if needed)
-
-If the new command adds a new workflow pattern, update `.claude/skills/clickup-cli.md` with a usage example.
-Prefer pointing contributors to `README.md` or `CONTRIBUTING.md` instead of duplicating general repo guidance here.

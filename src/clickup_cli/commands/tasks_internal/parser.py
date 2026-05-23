@@ -86,6 +86,7 @@ examples:
 
 notes:
   Output is compact by default (id, name, status, priority, url).
+  The bounded default fetches up to 2 pages and returns completeness metadata.
   Use --full for full task objects with normalized status shape, or --fields
   for custom field selection.
   At least one of --space or --list is required.
@@ -147,7 +148,7 @@ notes:
     tl.add_argument(
         "--all-pages",
         action="store_true",
-        help="Fetch every task page instead of the default bounded aggregate scan",
+        help="Fetch every task page instead of the default bounded aggregate scan (default: up to 2 pages)",
     )
 
     # tasks get
@@ -285,7 +286,7 @@ notes:
     tc.add_argument(
         "--priority",
         type=str,
-        help="Priority: urgent, high, normal, low (default: from config)",
+        help="Priority: urgent, high, normal, low (only sent when specified)",
     )
     tc.add_argument(
         "--assign",
@@ -471,6 +472,7 @@ examples:
 
 notes:
   Output is compact by default (id, name, status, priority, url).
+  The bounded default fetches up to 2 pages and returns completeness metadata.
   Use --full for full task objects with normalized status shape, or --fields
   for custom field selection.
   Queries matching the pattern ABC-123 auto-apply --name-prefix.
@@ -478,8 +480,8 @@ notes:
   Use `--space` to search the whole space across every list it owns.
   --custom-field applies equality filters as FIELD_ID=VALUE and is repeatable.
   --name-prefix filters the returned tasks client-side by task name prefix.
-  The search API has a default page size — this CLI handles pagination
-  automatically and returns all matching results.""",
+  The search API has a default page size; this CLI fetches up to 2 pages by
+  default and reports whether results are complete or truncated.""",
     )
     add_id_argument(ts, "query", "Search query string")
     ts.add_argument(
@@ -541,7 +543,7 @@ notes:
     ts.add_argument(
         "--all-pages",
         action="store_true",
-        help="Fetch every search results page instead of the default bounded aggregate scan",
+        help="Fetch every search results page instead of the default bounded aggregate scan (default: up to 2 pages)",
     )
 
     # tasks delete

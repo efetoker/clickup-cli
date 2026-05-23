@@ -49,7 +49,14 @@ class ClickUpClient:
             time.sleep(wait)
 
     def _request(self, method, url, allow_dry_run=False, **kwargs):
-        """Make an HTTP request with rate limit handling and error reporting."""
+        """Make an HTTP request with CLI-specific safety behavior.
+
+        In dry-run mode, requests return a preview unless allow_dry_run=True is
+        passed by a safe lookup path. HTTP 429 responses with reset headers are
+        slept and retried once. Safe GET requests retry transient 502/503/504
+        responses up to three attempts. Successful responses still trigger the
+        proactive low remaining rate-limit wait before JSON is returned.
+        """
         if self.dry_run and not allow_dry_run:
             return {"dry_run": True, "method": method, "url": url, "kwargs": kwargs}
 
