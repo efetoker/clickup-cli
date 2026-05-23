@@ -32,5 +32,8 @@ clickup-config.json
 .planning/
 .audit/
 
+# Local package manager artifacts
+uv.lock
+
 # Local-only Claude Code settings (permissions, etc.)
 .claude/settings.local.json
