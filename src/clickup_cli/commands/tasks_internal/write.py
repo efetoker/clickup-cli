@@ -133,6 +133,10 @@ def cmd_tasks_create(client, args):
         task_type = _resolve_task_type(client, raw_task_type)
         body["custom_item_id"] = task_type["id"]
 
+    parent = getattr(args, "parent", None)
+    if parent:
+        body["parent"] = parent
+
     if client.dry_run:
         if custom_fields or task_type or tags:
             return {
