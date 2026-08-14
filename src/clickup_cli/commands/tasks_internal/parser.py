@@ -245,6 +245,7 @@ examples:
   clickup tasks create --space <name> --name "Estimate" --time-estimate 90m --points 3
   clickup tasks create --space <name> --name "Bug" --custom-field field-1=high --task-type type-1
   clickup tasks create --space <name> --name "Bug" --tag urgent --tag backend
+  clickup tasks create --space <name> --name "Subtask" --parent <parent_task_id>
 
 notes:
   Provide either --space or --list.
@@ -255,6 +256,7 @@ notes:
   --custom-field uses FIELD_ID=VALUE and is repeatable.
   --tag is repeatable, auto-lowercased, and applied after task creation.
   --task-type accepts a task/custom item type ID from `task-types list`.
+  --parent (alias --parent-id) makes the new task a subtask of the given task ID; the parent must live in the same list.
   Does not support: checklists or attachments.""",
     )
     tc.add_argument(
@@ -331,6 +333,13 @@ notes:
         "--task-type",
         type=str,
         help="Task/custom item type ID from `task-types list`",
+    )
+    tc.add_argument(
+        "--parent",
+        "--parent-id",
+        dest="parent",
+        type=str,
+        help="Parent task ID — creates this task as a subtask of that task (must be in the same list)",
     )
 
     # tasks update

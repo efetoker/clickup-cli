@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`tasks create` can now create real subtasks.** A new `--parent <task_id>` flag (alias `--parent-id`) sets the API `parent` field so the new task is created as a subtask of an existing task in the same list. `--dry-run` shows the `parent` linkage in the request body.
+
 ## 1.8.0 (2026-04-26)
 
 - **Task output shaping and tagging workflows expanded.** `tasks get` now accepts `--fields` and `--full` alongside comment hydration flags, and `tasks create` supports repeatable `--tag` values applied after creation.

@@ -403,7 +403,7 @@ class TasksCreateBehaviorTests(unittest.TestCase):
                           priority=None, status=None, assign_user=None,
                           start_date=None, due_date=None,
                           time_estimate=None, points=None,
-                          custom_fields=None, task_type=None, tags=None)
+                          custom_fields=None, task_type=None, tags=None, parent=None)
         defaults.update(overrides)
         return Namespace(**defaults)
 
@@ -473,6 +473,29 @@ class TasksCreateBehaviorTests(unittest.TestCase):
         args = self._make_args(status="in progress")
         result = cmd_tasks_create(client, args)
         self.assertEqual(result["body"]["status"], "in progress")
+
+    def test_parent_flag_sets_body_parent(self):
+        client = FlexClient(dry_run=True)
+        args = self._make_args(parent="parent-123")
+        result = cmd_tasks_create(client, args)
+        self.assertEqual(result["body"]["parent"], "parent-123")
+
+    def test_no_parent_when_unset(self):
+        client = FlexClient(dry_run=True)
+        args = self._make_args()
+        result = cmd_tasks_create(client, args)
+        self.assertNotIn("parent", result["body"])
+
+    def test_parent_flag_parses_with_alias(self):
+        import argparse
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="group")
+        register_tasks_parser(subparsers, argparse.RawDescriptionHelpFormatter)
+        tasks_parser = subparsers.choices["tasks"]
+        args1 = tasks_parser.parse_args(["create", "--space", "testspace", "--name", "Sub", "--parent", "abc123"])
+        self.assertEqual(args1.parent, "abc123")
+        args2 = tasks_parser.parse_args(["create", "--space", "testspace", "--name", "Sub", "--parent-id", "def456"])
+        self.assertEqual(args2.parent, "def456")
 
     def test_richer_core_fields_appear_in_dry_run_body(self):
         client = FlexClient(dry_run=True)
