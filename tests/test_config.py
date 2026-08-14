@@ -86,9 +86,8 @@ class LoadFromFileTests(unittest.TestCase):
     """Tests for _load_from_file()."""
 
     def _write_config(self, data):
-        f = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-        json.dump(data, f)
-        f.close()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(data, f)
         return f.name
 
     def test_valid_config_loads(self):
@@ -106,9 +105,8 @@ class LoadFromFileTests(unittest.TestCase):
             os.unlink(path)
 
     def test_invalid_json_exits(self):
-        f = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-        f.write("not valid json {{{")
-        f.close()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            f.write("not valid json {{{")
         try:
             with self.assertRaises(SystemExit):
                 _load_from_file(f.name)
@@ -166,9 +164,8 @@ class FindConfigPathTests(unittest.TestCase):
             os.unlink(tmp)
 
     def test_env_path_missing_file_exits(self):
-        with patch.dict(os.environ, {"CLICKUP_CONFIG_PATH": "/nonexistent/config.json"}):
-            with self.assertRaises(SystemExit):
-                _find_config_path()
+        with patch.dict(os.environ, {"CLICKUP_CONFIG_PATH": "/nonexistent/config.json"}), self.assertRaises(SystemExit):
+            _find_config_path()
 
     def test_no_env_no_xdg_no_cwd_returns_none(self):
         with patch.dict(os.environ, {}, clear=False):
@@ -202,9 +199,8 @@ class NoConfigErrorTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("CLICKUP_CONFIG_PATH", None)
             os.environ.pop("CLICKUP_API_TOKEN", None)
-            with patch("clickup_cli.config._find_config_path", return_value=None):
-                with self.assertRaises(SystemExit):
-                    load_config()
+            with patch("clickup_cli.config._find_config_path", return_value=None), self.assertRaises(SystemExit):
+                load_config()
 
 
 class AutoDetectWorkspaceTests(unittest.TestCase):
@@ -212,35 +208,31 @@ class AutoDetectWorkspaceTests(unittest.TestCase):
 
     def test_connection_error_exits(self):
         import requests as req
-        with patch("requests.get", side_effect=req.ConnectionError("offline")):
-            with self.assertRaises(SystemExit):
-                _auto_detect_workspace("pk_test")
+        with patch("requests.get", side_effect=req.ConnectionError("offline")), self.assertRaises(SystemExit):
+            _auto_detect_workspace("pk_test")
 
     def test_401_exits(self):
         mock_resp = MagicMock()
         mock_resp.status_code = 401
         mock_resp.ok = False
-        with patch("requests.get", return_value=mock_resp):
-            with self.assertRaises(SystemExit):
-                _auto_detect_workspace("pk_test")
+        with patch("requests.get", return_value=mock_resp), self.assertRaises(SystemExit):
+            _auto_detect_workspace("pk_test")
 
     def test_non_ok_exits(self):
         mock_resp = MagicMock()
         mock_resp.status_code = 500
         mock_resp.ok = False
         mock_resp.text = "Internal Server Error"
-        with patch("requests.get", return_value=mock_resp):
-            with self.assertRaises(SystemExit):
-                _auto_detect_workspace("pk_test")
+        with patch("requests.get", return_value=mock_resp), self.assertRaises(SystemExit):
+            _auto_detect_workspace("pk_test")
 
     def test_no_teams_exits(self):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.ok = True
         mock_resp.json.return_value = {"teams": []}
-        with patch("requests.get", return_value=mock_resp):
-            with self.assertRaises(SystemExit):
-                _auto_detect_workspace("pk_test")
+        with patch("requests.get", return_value=mock_resp), self.assertRaises(SystemExit):
+            _auto_detect_workspace("pk_test")
 
     def test_single_team_returns_id(self):
         mock_resp = MagicMock()
@@ -261,9 +253,8 @@ class AutoDetectWorkspaceTests(unittest.TestCase):
                 {"id": 222, "name": "WS2"},
             ]
         }
-        with patch("requests.get", return_value=mock_resp):
-            with self.assertRaises(SystemExit):
-                _auto_detect_workspace("pk_test")
+        with patch("requests.get", return_value=mock_resp), self.assertRaises(SystemExit):
+            _auto_detect_workspace("pk_test")
 
 
 class SaveFieldToConfigTests(unittest.TestCase):

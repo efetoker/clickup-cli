@@ -10,6 +10,8 @@ from argparse import Namespace
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from command_fakes import FlexClient
+
 from clickup_cli.commands import tasks as tasks_commands
 from clickup_cli.commands.tasks import (
     cmd_tasks_add_to_list,
@@ -24,10 +26,11 @@ from clickup_cli.commands.tasks import (
     cmd_tasks_remove_from_list,
     cmd_tasks_search,
     cmd_tasks_update,
+)
+from clickup_cli.commands.tasks import (
     register_parser as register_tasks_parser,
 )
 
-from command_fakes import FlexClient
 
 class TasksGetTests(unittest.TestCase):
 
@@ -310,11 +313,11 @@ class TasksUpdateExpandedFieldsTests(unittest.TestCase):
     """Coverage for assignee/tag/custom-field support on tasks update."""
 
     def _args(self, **overrides):
-        defaults = dict(
-            task_id="t1", name=None, status=None, desc=None, desc_file=None,
-            priority=None, add_assignees=None, remove_assignees=None,
-            add_tags=None, remove_tags=None, custom_fields=None,
-        )
+        defaults = {
+            "task_id": "t1", "name": None, "status": None, "desc": None, "desc_file": None,
+            "priority": None, "add_assignees": None, "remove_assignees": None,
+            "add_tags": None, "remove_tags": None, "custom_fields": None,
+        }
         defaults.update(overrides)
         return Namespace(**defaults)
 
@@ -398,12 +401,12 @@ class TasksUpdateExpandedFieldsTests(unittest.TestCase):
 class TasksCreateBehaviorTests(unittest.TestCase):
 
     def _make_args(self, **overrides):
-        defaults = dict(space="testspace", list_id=None, name="Task",
-                          desc=None, desc_file=None,
-                          priority=None, status=None, assign_user=None,
-                          start_date=None, due_date=None,
-                          time_estimate=None, points=None,
-                          custom_fields=None, task_type=None, tags=None, parent=None)
+        defaults = {"space": "testspace", "list_id": None, "name": "Task",
+                          "desc": None, "desc_file": None,
+                          "priority": None, "status": None, "assign_user": None,
+                          "start_date": None, "due_date": None,
+                          "time_estimate": None, "points": None,
+                          "custom_fields": None, "task_type": None, "tags": None, "parent": None}
         defaults.update(overrides)
         return Namespace(**defaults)
 
@@ -701,19 +704,19 @@ class TasksCreateBehaviorTests(unittest.TestCase):
 class TasksSearchBehaviorTests(unittest.TestCase):
 
     def _make_search_args(self, **overrides):
-        defaults = dict(
-            query="bug",
-            include_closed=False,
-            include_archived=False,
-            space=None,
-            list_id=None,
-            folder_id=None,
-            name_prefix=None,
-            tags=None,
-            custom_fields=None,
-            fields=None,
-            full=False,
-        )
+        defaults = {
+            "query": "bug",
+            "include_closed": False,
+            "include_archived": False,
+            "space": None,
+            "list_id": None,
+            "folder_id": None,
+            "name_prefix": None,
+            "tags": None,
+            "custom_fields": None,
+            "fields": None,
+            "full": False,
+        }
         defaults.update(overrides)
         return Namespace(**defaults)
 
@@ -1004,10 +1007,10 @@ class TasksDependTests(unittest.TestCase):
     """Coverage for `tasks depend add/remove/list`."""
 
     def _args(self, subcommand, **overrides):
-        defaults = dict(
-            subcommand=subcommand, task_id="abc123",
-            depends_on=None, dependency_of=None,
-        )
+        defaults = {
+            "subcommand": subcommand, "task_id": "abc123",
+            "depends_on": None, "dependency_of": None,
+        }
         defaults.update(overrides)
         return Namespace(**defaults)
 
@@ -1067,11 +1070,11 @@ class TasksLinkTests(unittest.TestCase):
     """Coverage for `tasks link add/remove/list`."""
 
     def _args(self, subcommand, **overrides):
-        defaults = dict(
-            subcommand=subcommand,
-            task_id="abc123",
-            linked_task_id=None,
-        )
+        defaults = {
+            "subcommand": subcommand,
+            "task_id": "abc123",
+            "linked_task_id": None,
+        }
         defaults.update(overrides)
         return Namespace(**defaults)
 
@@ -1135,7 +1138,7 @@ class TasksMultiListTests(unittest.TestCase):
     """Coverage for task-scoped multi-list commands."""
 
     def _membership_args(self, **overrides):
-        defaults = dict(task_id="abc123", list_id="901816700000")
+        defaults = {"task_id": "abc123", "list_id": "901816700000"}
         defaults.update(overrides)
         return Namespace(**defaults)
 
@@ -1303,16 +1306,15 @@ class TasksBulkTests(unittest.TestCase):
         ]
 
         for plan in invalid_plans:
-            with self.subTest(plan=plan):
-                with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
-                    json.dump(plan, handle)
-                    handle.flush()
+            with self.subTest(plan=plan), tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+                json.dump(plan, handle)
+                handle.flush()
 
-                    with self.assertRaises(SystemExit):
-                        tasks_commands.cmd_tasks_bulk(
-                            client,
-                            Namespace(subcommand="tags", plan_file=handle.name, continue_on_error=False),
-                        )
+                with self.assertRaises(SystemExit):
+                    tasks_commands.cmd_tasks_bulk(
+                        client,
+                        Namespace(subcommand="tags", plan_file=handle.name, continue_on_error=False),
+                    )
 
         self.assertEqual(client.calls, [])
 
@@ -1433,11 +1435,11 @@ class TasksIncludeArchivedTests(unittest.TestCase):
     """--include-archived flag: second API call with archived=true, merged results."""
 
     def _list_args(self, **overrides):
-        defaults = dict(
-            space="testspace", list_id=None, include_closed=False,
-            include_archived=False, status=None, subtasks=False,
-            tags=None, fields=None, full=False, all_pages=False,
-        )
+        defaults = {
+            "space": "testspace", "list_id": None, "include_closed": False,
+            "include_archived": False, "status": None, "subtasks": False,
+            "tags": None, "fields": None, "full": False, "all_pages": False,
+        }
         defaults.update(overrides)
         return Namespace(**defaults)
 

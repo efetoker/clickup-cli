@@ -1,6 +1,6 @@
 """Doc command handlers — list, get, create, pages, get-page, edit-page, create-page."""
 
-from ..helpers import read_content, error, add_id_argument, resolve_space_id
+from ..helpers import add_id_argument, error, read_content, resolve_space_id
 
 
 def register_parser(subparsers, F):

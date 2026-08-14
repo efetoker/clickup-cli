@@ -1,7 +1,13 @@
 """Folder command handlers — list, get, create, update, delete, privacy."""
 
-from ..helpers import error, resolve_space_id, add_id_argument
-from .backup import backup_list, backup_options, count_folder_tasks, folder_child_lists, write_json
+from ..helpers import add_id_argument, error, resolve_space_id
+from .backup import (
+    backup_list,
+    backup_options,
+    count_folder_tasks,
+    folder_child_lists,
+    write_json,
+)
 from .privacy import handle_privacy_request, register_privacy_subcommand
 
 

@@ -1,6 +1,6 @@
 """Comment command handlers — list, add, update, delete, thread, reply."""
 
-from ..helpers import read_content, error, fetch_all_comments, add_id_argument
+from ..helpers import add_id_argument, error, fetch_all_comments, read_content
 
 
 def _comment_body(args, *, empty_message):

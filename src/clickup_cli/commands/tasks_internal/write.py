@@ -1,8 +1,8 @@
 """Write-oriented task handlers behind the facade."""
 
-from datetime import datetime, timezone
 import json
 import re
+from datetime import datetime, timezone
 
 from ...helpers import error, read_content
 from .shared import (
@@ -11,7 +11,6 @@ from .shared import (
     _resolve_list_id,
     _resolve_priority,
 )
-
 
 _TIME_ESTIMATE_RE = re.compile(r"^(\d+)([mhd])$")
 
