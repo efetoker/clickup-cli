@@ -100,7 +100,9 @@ class TaskTypesCommandTests(unittest.TestCase):
 
 class MetadataParserTests(unittest.TestCase):
     def test_metadata_groups_register_public_parsers(self):
-        from clickup_cli.commands.fields import register_parser as register_fields_parser
+        from clickup_cli.commands.fields import (
+            register_parser as register_fields_parser,
+        )
         from clickup_cli.commands.task_types import (
             register_parser as register_task_types_parser,
         )
@@ -124,7 +126,9 @@ class MetadataParserTests(unittest.TestCase):
         self.assertEqual(task_types_args.list_id, "12345")
 
     def test_fields_list_help_documents_scope_resolution(self):
-        from clickup_cli.commands.fields import register_parser as register_fields_parser
+        from clickup_cli.commands.fields import (
+            register_parser as register_fields_parser,
+        )
 
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(dest="group")

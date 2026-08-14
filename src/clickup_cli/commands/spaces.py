@@ -1,8 +1,7 @@
 """Space command handlers — list, get, create, update, delete, privacy."""
 
-from ..helpers import error, resolve_space_id, add_id_argument
+from ..helpers import add_id_argument, error, resolve_space_id
 from .privacy import handle_privacy_request, register_privacy_subcommand
-
 
 DEFAULT_SPACE_FEATURES = {
     "due_dates": {"enabled": True, "start_date": False, "remap_due_dates": False, "remap_closed_due_date": False},

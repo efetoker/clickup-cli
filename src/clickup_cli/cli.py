@@ -6,9 +6,8 @@ import sys
 
 from . import __version__
 from .client import ClickUpClient
-from .helpers import output, error, resolve_id_args
+from .helpers import error, output, resolve_id_args
 from .runtime import RuntimeContext
-
 
 GLOBAL_FLAGS = {"--pretty", "--dry-run", "--debug"}
 

@@ -769,15 +769,13 @@ class ParserComprehensiveTests(unittest.TestCase):
 
     def test_privacy_requires_mode(self):
         for group, object_id in [("spaces", "myspace"), ("folders", "f123"), ("lists", "l123")]:
-            with self.subTest(group=group):
-                with self.assertRaises(SystemExit):
-                    self._parse([group, "privacy", object_id])
+            with self.subTest(group=group), self.assertRaises(SystemExit):
+                self._parse([group, "privacy", object_id])
 
     def test_privacy_rejects_both_modes(self):
         for group, object_id in [("spaces", "myspace"), ("folders", "f123"), ("lists", "l123")]:
-            with self.subTest(group=group):
-                with self.assertRaises(SystemExit):
-                    self._parse([group, "privacy", object_id, "--private", "--public"])
+            with self.subTest(group=group), self.assertRaises(SystemExit):
+                self._parse([group, "privacy", object_id, "--private", "--public"])
 
     # --- folders ---
 
@@ -1247,6 +1245,7 @@ class EntrypointTests(unittest.TestCase):
             [sys.executable, "-m", "clickup_cli", "--help"],
             capture_output=True,
             text=True,
+            check=False,
         )
         self.assertEqual(result.returncode, 0)
         self.assertIn("ClickUp CLI", result.stdout)
@@ -1256,6 +1255,7 @@ class EntrypointTests(unittest.TestCase):
             [sys.executable, "-m", "clickup_cli", "--version"],
             capture_output=True,
             text=True,
+            check=False,
         )
         self.assertEqual(result.returncode, 0)
         self.assertIn("1.8.0", result.stdout)
@@ -1273,6 +1273,7 @@ class ConfigFallbackTests(unittest.TestCase):
         """When config has token but no workspace_id, auto-detect fills it in."""
         import json
         import tempfile
+
         from clickup_cli import config as config_module
         from clickup_cli.config import load_config
 
@@ -1293,9 +1294,8 @@ class ConfigFallbackTests(unittest.TestCase):
                 "teams": [{"id": "12345", "name": "Test Workspace"}]
             }
 
-            with patch.dict(os.environ, {"CLICKUP_CONFIG_PATH": tmp_path}):
-                with patch("requests.get", return_value=mock_resp):
-                    loaded_config = load_config()
+            with patch.dict(os.environ, {"CLICKUP_CONFIG_PATH": tmp_path}), patch("requests.get", return_value=mock_resp):
+                loaded_config = load_config()
 
             self.assertEqual(loaded_config["workspace_id"], "12345")
         finally:

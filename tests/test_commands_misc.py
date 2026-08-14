@@ -6,14 +6,14 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import requests
+from command_fakes import FlexClient
 
+from clickup_cli.commands import tags as tags_commands
 from clickup_cli.commands.docs import cmd_docs_create
 from clickup_cli.commands.init import cmd_init
-from clickup_cli.commands import tags as tags_commands
 from clickup_cli.commands.tags import cmd_tags_add, cmd_tags_list, cmd_tags_remove
 from clickup_cli.commands.team import cmd_team_members, cmd_team_whoami
 
-from command_fakes import FlexClient
 
 class TagsListTests(unittest.TestCase):
 
@@ -498,10 +498,8 @@ class InitTokenFlagTests(unittest.TestCase):
         mock_get.side_effect = [mock_team_resp, mock_spaces_resp]
 
         args = Namespace(token="pk_test_123")
-        with patch("builtins.open", unittest.mock.mock_open()):
-            with patch("os.makedirs"):
-                with patch("clickup_cli.commands.init.os.chmod"):
-                    cmd_init(args)
+        with patch("builtins.open", unittest.mock.mock_open()), patch("os.makedirs"), patch("clickup_cli.commands.init.os.chmod"):
+            cmd_init(args)
 
         # Should NOT have called input() — token was provided via flag
         self.assertEqual(mock_get.call_count, 2)
@@ -551,9 +549,8 @@ class InitErrorTests(unittest.TestCase):
     def test_empty_token_exits(self):
         """Empty token after input prompt exits."""
         args = Namespace(token=None)
-        with patch("builtins.input", return_value=""):
-            with self.assertRaises(SystemExit):
-                cmd_init(args)
+        with patch("builtins.input", return_value=""), self.assertRaises(SystemExit):
+            cmd_init(args)
 
     @patch("clickup_cli.commands.init.requests.get")
     def test_connection_error_exits(self, mock_get):
@@ -626,10 +623,8 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
             self._make_spaces_response(),
         ]
         args = Namespace(token="pk_test")
-        with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
-            with patch("os.makedirs"):
-                with patch("clickup_cli.commands.init.os.chmod"):
-                    cmd_init(args)
+        with patch("builtins.open", unittest.mock.mock_open()) as mock_file, patch("os.makedirs"), patch("clickup_cli.commands.init.os.chmod"):
+            cmd_init(args)
 
         # Verify config was written with correct workspace_id
         written = mock_file().write.call_args_list
@@ -648,11 +643,8 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
             self._make_spaces_response(),
         ]
         args = Namespace(token="pk_test")
-        with patch("builtins.input", return_value="2"):
-            with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
-                with patch("os.makedirs"):
-                    with patch("clickup_cli.commands.init.os.chmod"):
-                        cmd_init(args)
+        with patch("builtins.input", return_value="2"), patch("builtins.open", unittest.mock.mock_open()) as mock_file, patch("os.makedirs"), patch("clickup_cli.commands.init.os.chmod"):
+            cmd_init(args)
 
         written = mock_file().write.call_args_list
         written_text = "".join(call[0][0] for call in written)
@@ -670,11 +662,8 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
             self._make_spaces_response(),
         ]
         args = Namespace(token="pk_test")
-        with patch("builtins.input", return_value=""):
-            with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
-                with patch("os.makedirs"):
-                    with patch("clickup_cli.commands.init.os.chmod"):
-                        cmd_init(args)
+        with patch("builtins.input", return_value=""), patch("builtins.open", unittest.mock.mock_open()) as mock_file, patch("os.makedirs"), patch("clickup_cli.commands.init.os.chmod"):
+            cmd_init(args)
 
         written = mock_file().write.call_args_list
         written_text = "".join(call[0][0] for call in written)
@@ -695,10 +684,8 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
             spaces_resp,
         ]
         args = Namespace(token="pk_test")
-        with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
-            with patch("os.makedirs"):
-                with patch("clickup_cli.commands.init.os.chmod"):
-                    cmd_init(args)
+        with patch("builtins.open", unittest.mock.mock_open()) as mock_file, patch("os.makedirs"), patch("clickup_cli.commands.init.os.chmod"):
+            cmd_init(args)
 
         written = mock_file().write.call_args_list
         written_text = "".join(call[0][0] for call in written)
@@ -716,13 +703,11 @@ class InitWorkspaceSelectionTests(unittest.TestCase):
         ]
         mock_get.return_value = self._make_team_response(teams)
         args = Namespace(token="pk_test")
-        with patch("builtins.input", side_effect=EOFError):
-            with self.assertRaises(SystemExit):
-                cmd_init(args)
+        with patch("builtins.input", side_effect=EOFError), self.assertRaises(SystemExit):
+            cmd_init(args)
 
     def test_eof_during_token_input_exits(self):
         """EOFError during token input aborts gracefully."""
         args = Namespace(token=None)
-        with patch("builtins.input", side_effect=EOFError):
-            with self.assertRaises(SystemExit):
-                cmd_init(args)
+        with patch("builtins.input", side_effect=EOFError), self.assertRaises(SystemExit):
+            cmd_init(args)

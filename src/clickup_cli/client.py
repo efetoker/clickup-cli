@@ -3,6 +3,7 @@
 import json as _json
 import sys
 import time
+from typing import ClassVar
 
 import requests
 
@@ -13,8 +14,8 @@ from .runtime import RuntimeContext
 class ClickUpClient:
     BASE_V2 = "https://api.clickup.com/api/v2"
     BASE_V3 = "https://api.clickup.com/api/v3"
-    TRANSIENT_RETRY_STATUSES = {502, 503, 504}
-    TRANSIENT_RETRY_METHODS = {"GET"}
+    TRANSIENT_RETRY_STATUSES: ClassVar[set[int]] = {502, 503, 504}
+    TRANSIENT_RETRY_METHODS: ClassVar[set[str]] = {"GET"}
     TRANSIENT_RETRY_ATTEMPTS = 3
     TRANSIENT_RETRY_BACKOFF_SECONDS = 0.25
 

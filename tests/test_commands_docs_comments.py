@@ -6,6 +6,8 @@ import unittest
 from argparse import Namespace
 from types import SimpleNamespace
 
+from command_fakes import FlexClient
+
 from clickup_cli.commands.comments import (
     cmd_comments_add,
     cmd_comments_delete,
@@ -22,10 +24,11 @@ from clickup_cli.commands.docs import (
     cmd_docs_get_page,
     cmd_docs_list,
     cmd_docs_pages,
+)
+from clickup_cli.commands.docs import (
     register_parser as register_docs_parser,
 )
 
-from command_fakes import FlexClient
 
 class CommentsListTests(unittest.TestCase):
 

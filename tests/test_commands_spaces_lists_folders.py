@@ -7,14 +7,16 @@ from argparse import Namespace
 from pathlib import Path
 from types import SimpleNamespace
 
+from command_fakes import FlexClient
+
 from clickup_cli.commands.folders import (
     cmd_folders_backup,
     cmd_folders_create,
     cmd_folders_delete,
     cmd_folders_get,
     cmd_folders_list,
-    cmd_folders_purge_empty,
     cmd_folders_privacy,
+    cmd_folders_purge_empty,
     cmd_folders_update,
 )
 from clickup_cli.commands.lists import (
@@ -36,7 +38,6 @@ from clickup_cli.commands.spaces import (
     cmd_spaces_update,
 )
 
-from command_fakes import FlexClient
 
 class FoldersListTests(unittest.TestCase):
 

@@ -1,6 +1,6 @@
 """List command handlers — list, get, create, update, delete, privacy."""
 
-from ..helpers import read_content, error, resolve_space_id, add_id_argument
+from ..helpers import add_id_argument, error, read_content, resolve_space_id
 from .backup import backup_list, backup_options, count_list_tasks
 from .privacy import handle_privacy_request, register_privacy_subcommand
 
