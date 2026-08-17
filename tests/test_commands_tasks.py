@@ -251,6 +251,83 @@ class TasksListDryRunTests(unittest.TestCase):
         self.assertEqual(result["list_id"], "runtime_list")
         self.assertEqual(client.calls[0]["path"], "/space/runtime_space/list")
 
+class TasksLimitFlagTests(unittest.TestCase):
+    """--limit flag on tasks list caps the returned task count."""
+
+    def _task(self, idx):
+        return {
+            "id": f"t{idx}",
+            "name": f"Task {idx}",
+            "status": {"status": "open"},
+            "priority": None,
+            "url": f"https://app.clickup.com/t/t{idx}",
+        }
+
+    def _list_client(self, count):
+        tasks = [self._task(i) for i in range(count)]
+        return FlexClient(responses={"/task": {"tasks": tasks, "last_page": True}})
+
+    def _list_args(self, **overrides):
+        defaults = {
+            "space": "testspace",
+            "list_id": None,
+            "include_closed": False,
+            "status": None,
+            "subtasks": False,
+            "fields": None,
+            "full": False,
+            "limit": None,
+        }
+        defaults.update(overrides)
+        return Namespace(**defaults)
+
+    def test_list_limit_caps_results(self):
+        client = self._list_client(5)
+        result = cmd_tasks_list(client, self._list_args(limit=2))
+        self.assertEqual(result["count"], 2)
+        self.assertEqual([task["id"] for task in result["tasks"]], ["t0", "t1"])
+
+    def test_list_limit_larger_than_results_keeps_all(self):
+        client = self._list_client(3)
+        result = cmd_tasks_list(client, self._list_args(limit=99))
+        self.assertEqual(result["count"], 3)
+
+    def test_list_without_limit_returns_all(self):
+        client = self._list_client(4)
+        result = cmd_tasks_list(client, self._list_args())
+        self.assertEqual(result["count"], 4)
+
+    def test_list_limit_caps_merged_archived_results(self):
+        """--limit applies after the active + archived passes are merged."""
+        client = FlexClient(responses={
+            "/task": [
+                {"tasks": [self._task(0), self._task(1)], "last_page": True},
+                {"tasks": [self._task(2), self._task(3)], "last_page": True},
+            ]
+        })
+        result = cmd_tasks_list(
+            client, self._list_args(include_archived=True, limit=2)
+        )
+        self.assertEqual(result["count"], 2)
+        self.assertEqual([task["id"] for task in result["tasks"]], ["t0", "t1"])
+        self.assertEqual(result["pages_fetched"], 2)
+        self.assertTrue(result["results_complete"])
+
+    def test_list_limit_caps_after_exhaustive_scan(self):
+        """--limit applies after an --all-pages scan past the default budget."""
+        client = FlexClient(responses={
+            "/task": [
+                {"tasks": [self._task(0), self._task(1)], "last_page": False},
+                {"tasks": [self._task(2), self._task(3)], "last_page": False},
+                {"tasks": [self._task(4)], "last_page": True},
+            ]
+        })
+        result = cmd_tasks_list(client, self._list_args(all_pages=True, limit=1))
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["tasks"][0]["id"], "t0")
+        self.assertEqual(result["pages_fetched"], 3)
+        self.assertTrue(result["results_complete"])
+
 
 class TasksUpdateBehaviorTests(unittest.TestCase):
 
@@ -751,6 +828,25 @@ class TasksSearchBehaviorTests(unittest.TestCase):
         self.assertTrue(result["tasks"][0]["name"].startswith("PROJ-39"))
         # Auto-prefix must be silent (no informational hint on stderr)
         self.assertEqual(buf.getvalue(), "")
+
+    def test_search_limit_caps_results_after_filters(self):
+        """--limit applies after the client-side name-prefix filter."""
+        client = FlexClient(responses={
+            "/task": {
+                "tasks": [
+                    {"name": "PROJ-39: First", "status": {"status": "open"}, "priority": None, "id": "t1", "url": "u"},
+                    {"name": "PROJ-39: Second", "status": {"status": "open"}, "priority": None, "id": "t2", "url": "u"},
+                    {"name": "Unrelated task", "status": {"status": "open"}, "priority": None, "id": "t3", "url": "u"},
+                ],
+                "last_page": True,
+            }
+        })
+        args = self._make_search_args(query="PROJ-39", limit=1)
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            result = cmd_tasks_search(client, args)
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["tasks"][0]["id"], "t1")
 
     def test_space_scoping_expands_alias_to_all_lists_in_space(self):
         client = self._search_client_for_full_space_scope()

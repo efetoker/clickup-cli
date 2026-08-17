@@ -83,6 +83,26 @@ class CliArgumentTests(unittest.TestCase):
         self.assertEqual(args.command, "list")
         self.assertEqual(args.space, "staging")
 
+    def test_tasks_list_and_search_accept_limit(self):
+        parser = cli.build_parser()
+
+        list_args = parser.parse_args(["tasks", "list", "--space", "staging", "--limit", "8"])
+        self.assertEqual(list_args.limit, 8)
+
+        search_args = parser.parse_args(["tasks", "search", "bug", "--limit", "5"])
+        self.assertEqual(search_args.limit, 5)
+
+    def test_tasks_list_limit_rejects_non_positive_or_non_integer(self):
+        parser = cli.build_parser()
+
+        for bad_value in ("0", "-1", "abc", "1.5"):
+            with self.subTest(value=bad_value):
+                with self.assertRaises(SystemExit) as ctx:
+                    parser.parse_args(
+                        ["tasks", "list", "--space", "staging", "--limit", bad_value]
+                    )
+                self.assertEqual(ctx.exception.code, 2)
+
     def test_normalize_cli_argv_deduplicates_repeated_global_flags(self):
         argv = ["tasks", "list", "--pretty", "--space", "staging", "--pretty", "--dry-run"]
 

@@ -19,6 +19,9 @@ def _parse_fields(args):
 
 def _format_and_wrap(tasks, args):
     """Format tasks and wrap in the standard response dict."""
+    limit = getattr(args, "limit", None)
+    if limit is not None:
+        tasks = tasks[:limit]
     fields = _parse_fields(args)
     full = getattr(args, "full", False)
     formatted = format_tasks(tasks, full=full, fields=fields)
