@@ -1,6 +1,22 @@
 """Task parser registration implementation."""
 
+import argparse
+
 from ...helpers import add_id_argument
+
+
+def _positive_int(value):
+    """argparse type: require a positive integer (used by --limit)."""
+    try:
+        number = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid integer: {value!r}")
+    if number < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return number
+
+
+
 
 
 def register_parser(subparsers, F):
@@ -82,11 +98,13 @@ examples:
   clickup tasks list --space <name> --include-archived
   clickup tasks list --space <name> --status "in progress"
   clickup tasks list --space <name> --subtasks
+  clickup tasks list --space <name> --limit 8
   clickup tasks list --space <name> --tag "created by claude"
 
 notes:
   Output is compact by default (id, name, status, priority, url).
   The bounded default fetches up to 2 pages and returns completeness metadata.
+  Use --limit to cap the number of tasks returned (applied after filters).
   Use --full for full task objects with normalized status shape, or --fields
   for custom field selection.
   At least one of --space or --list is required.
@@ -149,6 +167,12 @@ notes:
         "--all-pages",
         action="store_true",
         help="Fetch every task page instead of the default bounded aggregate scan (default: up to 2 pages)",
+    )
+    tl.add_argument(
+        "--limit",
+        type=_positive_int,
+        metavar="N",
+        help="Cap the number of tasks returned (applied after pagination and filters)",
     )
 
     # tasks get
@@ -478,10 +502,12 @@ examples:
   clickup tasks search "bug" --fields id,name,url
   clickup tasks search "bug" --list 12345
   clickup tasks search "bug" --custom-field abc123=high
+  clickup tasks search "bug" --limit 8
 
 notes:
   Output is compact by default (id, name, status, priority, url).
   The bounded default fetches up to 2 pages and returns completeness metadata.
+  Use --limit to cap the number of tasks returned (applied after filters).
   Use --full for full task objects with normalized status shape, or --fields
   for custom field selection.
   Queries matching the pattern ABC-123 auto-apply --name-prefix.
@@ -553,6 +579,12 @@ notes:
         "--all-pages",
         action="store_true",
         help="Fetch every search results page instead of the default bounded aggregate scan (default: up to 2 pages)",
+    )
+    ts.add_argument(
+        "--limit",
+        type=_positive_int,
+        metavar="N",
+        help="Cap the number of tasks returned (applied after pagination and filters)",
     )
 
     # tasks delete
