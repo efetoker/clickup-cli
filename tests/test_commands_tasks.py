@@ -268,16 +268,16 @@ class TasksLimitFlagTests(unittest.TestCase):
         return FlexClient(responses={"/task": {"tasks": tasks, "last_page": True}})
 
     def _list_args(self, **overrides):
-        defaults = dict(
-            space="testspace",
-            list_id=None,
-            include_closed=False,
-            status=None,
-            subtasks=False,
-            fields=None,
-            full=False,
-            limit=None,
-        )
+        defaults = {
+            "space": "testspace",
+            "list_id": None,
+            "include_closed": False,
+            "status": None,
+            "subtasks": False,
+            "fields": None,
+            "full": False,
+            "limit": None,
+        }
         defaults.update(overrides)
         return Namespace(**defaults)
 
