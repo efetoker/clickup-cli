@@ -126,7 +126,7 @@ clickup tasks list --space <name> --pretty
 - **`tasks search`** auto-detects task ID patterns like `PROJ-39` and applies prefix filtering.
 - **`tasks bulk move` / `tasks bulk tags`** provide dry-run-friendly batch migration flows with resume-oriented failure details.
 - **`lists backup` / `folders backup`** write local JSON backups with safety-first defaults before migration or deletion; `folders purge-empty` only deletes after exhaustive empty-folder proof. List backups include `list.json`, `tasks.json`, `tasks/<task_id>.json`, and `manifest.json`; folder backups include `folder.json`, nested list backup directories, and a folder `manifest.json`.
-- **Space tag lifecycle** — `tags create`, `tags delete`, and `tags usage` manage and audit Space-level tags; task-level `tags add` / `tags remove` remain available.
+- **Space tag lifecycle** — `tags create`, `tags delete`, and `tags usage` manage and audit Space-level tags; task-level `tags add` / `tags remove` remain available. `tags usage <space>` (no `--tag`) audits every tag in the space in one scan, returning per-tag usage counts including zero-usage tags; `tags usage <space> --tag X` keeps the single-tag report with task lists.
 - **GET retries and rate limits** — transient ClickUp 502/503/504 responses are retried only for safe GET requests. A 429 with `X-RateLimit-Reset` sleeps and retries once, and successful responses with fewer than 10 remaining requests sleep until reset before returning.
 - **`docs edit-page --append`** reads the current page content, appends your new content, and sends one update.
 - **Tag names** are auto-lowercased (ClickUp API stores them lowercase regardless of UI display).
