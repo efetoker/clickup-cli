@@ -286,6 +286,184 @@ class TagsUsageTests(unittest.TestCase):
         self.assertIn("task-archived-in-active-folder", {task["id"] for task in result["tasks"]})
         self.assertEqual(result["lists_scanned"], 5)
 
+    def test_usage_all_tags_returns_per_tag_counts(self):
+        client = FlexClient(
+            responses={
+                "/space/111/tag": {"tags": [{"name": "Urgent"}, {"name": "Draft"}]},
+                "/space/111/list": {"lists": [{"id": "list-1"}]},
+                "/space/111/folder": {"folders": []},
+                "/list/list-1/task": {
+                    "tasks": [
+                        {"id": "t1", "name": "A", "url": "u1", "status": {"status": "open"}, "tags": [{"name": "urgent"}]},
+                        {"id": "t2", "name": "B", "url": "u2", "status": {"status": "open"}, "tags": [{"name": "urgent"}, {"name": "draft"}]},
+                    ],
+                    "last_page": True,
+                },
+            }
+        )
+        args = Namespace(
+            space="testspace",
+            tag=None,
+            include_closed=False,
+            include_archived=False,
+            subtasks=False,
+            all_pages=False,
+        )
+
+        result = tags_commands.cmd_tags_usage(client, args)
+
+        self.assertEqual(
+            result["tags"],
+            [{"name": "urgent", "count": 2}, {"name": "draft", "count": 1}],
+        )
+        self.assertEqual(result["count"], 2)
+        self.assertNotIn("tasks", result)
+        self.assertEqual(result["lists_scanned"], 1)
+        self.assertTrue(result["results_complete"])
+
+    def test_usage_all_tags_includes_zero_count_space_tags(self):
+        client = FlexClient(
+            responses={
+                "/space/111/tag": {"tags": [{"name": "urgent"}, {"name": "orphan"}]},
+                "/space/111/list": {"lists": [{"id": "list-1"}]},
+                "/space/111/folder": {"folders": []},
+                "/list/list-1/task": {
+                    "tasks": [
+                        {"id": "t1", "name": "A", "url": "u1", "status": {"status": "open"}, "tags": [{"name": "urgent"}]},
+                    ],
+                    "last_page": True,
+                },
+            }
+        )
+        args = Namespace(
+            space="testspace",
+            tag=None,
+            include_closed=False,
+            include_archived=False,
+            subtasks=False,
+            all_pages=False,
+        )
+
+        result = tags_commands.cmd_tags_usage(client, args)
+
+        self.assertEqual(
+            result["tags"],
+            [{"name": "urgent", "count": 1}, {"name": "orphan", "count": 0}],
+        )
+
+    def test_usage_all_tags_include_archived_merges_counts(self):
+        def _tasks(path, kwargs):
+            archived = kwargs.get("params", {}).get("archived")
+            task = {"id": "t-archived" if archived == "true" else "t-active",
+                    "name": "A", "url": "u", "status": {"status": "open"},
+                    "tags": [{"name": "urgent"}]}
+            return {"tasks": [task], "last_page": True}
+
+        client = FlexClient(
+            responses={
+                "/space/111/tag": {"tags": [{"name": "urgent"}]},
+                "/space/111/list": {"lists": [{"id": "list-1"}]},
+                "/space/111/folder": {"folders": []},
+                "/list/list-1/task": _tasks,
+            }
+        )
+        args = Namespace(
+            space="testspace",
+            tag=None,
+            include_closed=False,
+            include_archived=True,
+            subtasks=False,
+            all_pages=False,
+        )
+
+        result = tags_commands.cmd_tags_usage(client, args)
+
+        self.assertEqual(result["tags"], [{"name": "urgent", "count": 2}])
+
+    def test_usage_empty_tag_keeps_single_tag_mode(self):
+        client = FlexClient(
+            responses={
+                "/space/111/list": {"lists": [{"id": "list-1"}]},
+                "/space/111/folder": {"folders": []},
+                "/list/list-1/task": {
+                    "tasks": [
+                        {"id": "t1", "name": "A", "url": "u1", "status": {"status": "open"}, "tags": [{"name": "urgent"}]},
+                    ],
+                    "last_page": True,
+                },
+            }
+        )
+        args = Namespace(
+            space="testspace",
+            tag="",
+            include_closed=False,
+            include_archived=False,
+            subtasks=False,
+            all_pages=False,
+        )
+
+        result = tags_commands.cmd_tags_usage(client, args)
+
+        self.assertEqual(result["tag"], "")
+        self.assertEqual(result["count"], 0)
+        self.assertEqual(result["tasks"], [])
+
+    def test_usage_all_tags_ignores_task_tags_not_in_space(self):
+        client = FlexClient(
+            responses={
+                "/space/111/tag": {"tags": [{"name": "urgent"}]},
+                "/space/111/list": {"lists": [{"id": "list-1"}]},
+                "/space/111/folder": {"folders": []},
+                "/list/list-1/task": {
+                    "tasks": [
+                        {"id": "t1", "name": "A", "url": "u1", "status": {"status": "open"}, "tags": [{"name": "ghost"}]},
+                        {"id": "t2", "name": "B", "url": "u2", "status": {"status": "open"}, "tags": [{"name": "urgent"}]},
+                    ],
+                    "last_page": True,
+                },
+            }
+        )
+        args = Namespace(
+            space="testspace",
+            tag=None,
+            include_closed=False,
+            include_archived=False,
+            subtasks=False,
+            all_pages=False,
+        )
+
+        result = tags_commands.cmd_tags_usage(client, args)
+
+        self.assertEqual(result["tags"], [{"name": "urgent", "count": 1}])
+
+    def test_usage_all_tags_empty_space_tag_list(self):
+        client = FlexClient(
+            responses={
+                "/space/111/tag": {"tags": []},
+                "/space/111/list": {"lists": [{"id": "list-1"}]},
+                "/space/111/folder": {"folders": []},
+                "/list/list-1/task": {
+                    "tasks": [
+                        {"id": "t1", "name": "A", "url": "u1", "status": {"status": "open"}, "tags": [{"name": "urgent"}]},
+                    ],
+                    "last_page": True,
+                },
+            }
+        )
+        args = Namespace(
+            space="testspace",
+            tag=None,
+            include_closed=False,
+            include_archived=False,
+            subtasks=False,
+            all_pages=False,
+        )
+
+        result = tags_commands.cmd_tags_usage(client, args)
+
+        self.assertEqual(result["tags"], [])
+        self.assertEqual(result["count"], 0)
+
 
 # ─── Team ─────────────────────────────────────────────────────────────────
 

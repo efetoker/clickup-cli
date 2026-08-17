@@ -103,6 +103,23 @@ class CliArgumentTests(unittest.TestCase):
                     )
                 self.assertEqual(ctx.exception.code, 2)
 
+    def test_tags_usage_accepts_positional_space_and_optional_tag(self):
+        parser = cli.build_parser()
+
+        audit_args = parser.parse_args(["tags", "usage", "personal"])
+        self.assertEqual(audit_args.space, "personal")
+        self.assertIsNone(audit_args.tag)
+
+        single_args = parser.parse_args(["tags", "usage", "personal", "--tag", "cli"])
+        self.assertEqual(single_args.space, "personal")
+        self.assertEqual(single_args.tag, "cli")
+
+        flag_args = parser.parse_args(
+            ["tags", "usage", "--space", "personal", "--tag", "cli"]
+        )
+        self.assertEqual(flag_args._space_flag, "personal")
+        self.assertEqual(flag_args.tag, "cli")
+
     def test_normalize_cli_argv_deduplicates_repeated_global_flags(self):
         argv = ["tasks", "list", "--pretty", "--space", "staging", "--pretty", "--dry-run"]
 

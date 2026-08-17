@@ -36,6 +36,7 @@ examples:
   clickup tags create --space <name> --tag urgent --bg-color "#ff0000"
   clickup --dry-run tags delete --space <name> --tag "in review"
   clickup tags usage --space <name> --tag urgent --include-closed
+  clickup tags usage personal
   clickup tags add abc123 --tag "in review"
   clickup tags remove abc123 --tag "draft" """,
     )
@@ -114,23 +115,41 @@ examples:
     tgu = tags_sub.add_parser(
         "usage",
         formatter_class=F,
-        help="Audit task usage for a Space tag",
+        help="Audit task usage for a Space tag, or for every tag in the space",
         description="""\
 Scan tasks in a Space and report which tasks currently use a tag.
 
+With --tag, audits that single tag and lists the matching tasks. Without
+--tag, audits every tag in the space: one space-tag read plus one task
+scan, counted client-side, returning per-tag usage counts only (no task
+lists). Zero-usage tags are included with count 0, sorted by count
+descending then name.
+
 By default this is a bounded active-task scan. Add --include-closed,
 --include-archived, --subtasks, and --all-pages for exhaustive migration
-checks.""",
+checks. These flags apply to both modes.""",
         epilog="""\
-returns:
-  {"tag": "...", "count": N, "tasks": [...], "results_complete": true|false}
+returns (single tag):
+  {"tag": "...", "count": N, "tasks": [...], "lists_scanned": N,
+   "pages_fetched": N, "results_complete": true|false,
+   "results_truncated": true|false}
+
+returns (all tags):
+  {"tags": [{"name": "...", "count": N}, ...], "count": N,
+   "lists_scanned": N, "pages_fetched": N, "results_complete": true|false,
+   "results_truncated": true|false}
 
 examples:
-  clickup tags usage --space <name> --tag urgent
-  clickup tags usage --space <name> --tag urgent --include-closed --include-archived --subtasks --all-pages""",
+  clickup tags usage personal
+  clickup tags usage --space personal --tag urgent
+  clickup tags usage personal --include-closed --include-archived --subtasks --all-pages""",
     )
-    tgu.add_argument("--space", required=True, type=str, help="Space name or raw ID")
-    tgu.add_argument("--tag", required=True, type=str, help="Tag name to audit")
+    add_id_argument(tgu, "space", "Space name (from config) or raw space ID")
+    tgu.add_argument(
+        "--tag",
+        type=str,
+        help="Tag name to audit (omit to audit every tag in the space)",
+    )
     tgu.add_argument("--include-closed", action="store_true", help="Include closed tasks")
     tgu.add_argument("--include-archived", action="store_true", help="Include archived lists/tasks")
     tgu.add_argument("--subtasks", action="store_true", help="Include subtasks")
@@ -242,8 +261,8 @@ def cmd_tags_delete(client, args):
 
 
 def cmd_tags_usage(client, args):
-    """Audit task usage for a Space-level tag."""
-    tag_name = args.tag.lower()
+    """Audit task usage for one Space tag, or every tag in the space."""
+    tag_name = args.tag.lower() if getattr(args, "tag", None) is not None else None
     include_archived = getattr(args, "include_archived", False)
     space_id = resolve_space_id(args.space, spaces=client.runtime.spaces)
     list_ids = _resolve_scope_list_ids(
@@ -298,12 +317,33 @@ def cmd_tags_usage(client, args):
             pages_fetched += result["pages_fetched"]
             complete = complete and result["complete"]
 
-    matching = _filter_by_tags(all_tasks, [tag_name])
-    tasks = [compact_task(task) for task in matching]
+    if tag_name is not None:
+        matching = _filter_by_tags(all_tasks, [tag_name])
+        tasks = [compact_task(task) for task in matching]
+        return {
+            "tag": tag_name,
+            "count": len(tasks),
+            "tasks": tasks,
+            "lists_scanned": len(list_ids),
+            "pages_fetched": pages_fetched,
+            "results_complete": complete,
+            "results_truncated": not complete,
+        }
+
+    space_tags = client.get_v2(f"/space/{space_id}/tag", allow_dry_run=True).get("tags", [])
+    counts = {tag["name"].lower(): 0 for tag in space_tags}
+    for task in all_tasks:
+        for tag in task.get("tags", []):
+            name = tag["name"].lower()
+            if name in counts:
+                counts[name] += 1
+    tags = [
+        {"name": name, "count": counts[name]}
+        for name in sorted(counts, key=lambda name: (-counts[name], name))
+    ]
     return {
-        "tag": tag_name,
-        "count": len(tasks),
-        "tasks": tasks,
+        "tags": tags,
+        "count": len(tags),
         "lists_scanned": len(list_ids),
         "pages_fetched": pages_fetched,
         "results_complete": complete,
