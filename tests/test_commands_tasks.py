@@ -297,6 +297,37 @@ class TasksLimitFlagTests(unittest.TestCase):
         result = cmd_tasks_list(client, self._list_args())
         self.assertEqual(result["count"], 4)
 
+    def test_list_limit_caps_merged_archived_results(self):
+        """--limit applies after the active + archived passes are merged."""
+        client = FlexClient(responses={
+            "/task": [
+                {"tasks": [self._task(0), self._task(1)], "last_page": True},
+                {"tasks": [self._task(2), self._task(3)], "last_page": True},
+            ]
+        })
+        result = cmd_tasks_list(
+            client, self._list_args(include_archived=True, limit=2)
+        )
+        self.assertEqual(result["count"], 2)
+        self.assertEqual([task["id"] for task in result["tasks"]], ["t0", "t1"])
+        self.assertEqual(result["pages_fetched"], 2)
+        self.assertTrue(result["results_complete"])
+
+    def test_list_limit_caps_after_exhaustive_scan(self):
+        """--limit applies after an --all-pages scan past the default budget."""
+        client = FlexClient(responses={
+            "/task": [
+                {"tasks": [self._task(0), self._task(1)], "last_page": False},
+                {"tasks": [self._task(2), self._task(3)], "last_page": False},
+                {"tasks": [self._task(4)], "last_page": True},
+            ]
+        })
+        result = cmd_tasks_list(client, self._list_args(all_pages=True, limit=1))
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["tasks"][0]["id"], "t0")
+        self.assertEqual(result["pages_fetched"], 3)
+        self.assertTrue(result["results_complete"])
+
 
 class TasksUpdateBehaviorTests(unittest.TestCase):
 
