@@ -7,7 +7,7 @@ from argparse import Namespace
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from clickup_cli import cli
+from clickup_cli import __version__, cli
 from clickup_cli.client import ClickUpClient
 from clickup_cli.commands.comments import cmd_comments_add
 from clickup_cli.commands.docs import cmd_docs_edit_page
@@ -195,6 +195,14 @@ class CliArgumentTests(unittest.TestCase):
             parser.parse_args(
                 ["tasks", "update", "t1", "--priority", "high", "--clear-priority"]
             )
+
+        self.assertEqual(ctx.exception.code, 2)
+
+    def test_tasks_update_parser_rejects_archive_with_unarchive(self):
+        parser = cli.build_parser()
+
+        with self.assertRaises(SystemExit) as ctx:
+            parser.parse_args(["tasks", "update", "t1", "--archive", "--unarchive"])
 
         self.assertEqual(ctx.exception.code, 2)
 
@@ -1042,6 +1050,24 @@ class ParserComprehensiveTests(unittest.TestCase):
         self.assertEqual(args.plan_file, "plan.json")
         self.assertTrue(args.continue_on_error)
 
+    def test_tasks_bulk_archive(self):
+        args = self._parse([
+            "tasks",
+            "bulk",
+            "archive",
+            "--task-id",
+            "a",
+            "--task-file",
+            "ids.txt",
+            "--unarchive",
+        ])
+        self.assertEqual(args.command, "bulk")
+        self.assertEqual(args.subcommand, "archive")
+        self.assertEqual(args.task_ids, ["a"])
+        self.assertEqual(args.task_file, "ids.txt")
+        self.assertTrue(args.unarchive)
+        self.assertFalse(args.continue_on_error)
+
     def test_tasks_search_all_pages(self):
         args = self._parse(["tasks", "search", "bug", "--all-pages"])
         self.assertTrue(args.all_pages)
@@ -1295,7 +1321,7 @@ class EntrypointTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 0)
-        self.assertIn("1.8.0", result.stdout)
+        self.assertIn(__version__, result.stdout)
 
 
 class ConfigFallbackTests(unittest.TestCase):

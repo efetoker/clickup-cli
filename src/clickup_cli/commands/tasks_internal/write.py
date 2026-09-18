@@ -202,6 +202,10 @@ def cmd_tasks_update(client, args):
         body["priority"] = _resolve_priority(args.priority)
     if getattr(args, "clear_priority", False):
         body["priority"] = None
+    if getattr(args, "archive", False):
+        body["archived"] = True
+    if getattr(args, "unarchive", False):
+        body["archived"] = False
 
     add_assignees = [int(user_id) for user_id in (getattr(args, "add_assignees", None) or [])]
     rem_assignees = [int(user_id) for user_id in (getattr(args, "remove_assignees", None) or [])]
@@ -218,8 +222,8 @@ def cmd_tasks_update(client, args):
     if not body and not add_tags and not remove_tags and not custom_fields:
         error(
             "Nothing to update — provide at least one of: --name, --status, --desc, "
-            "--desc-file, --priority, --clear-priority, --add-assignee, "
-            "--remove-assignee, --add-tag, --remove-tag, --custom-field"
+            "--desc-file, --priority, --clear-priority, --archive, --unarchive, "
+            "--add-assignee, --remove-assignee, --add-tag, --remove-tag, --custom-field"
         )
 
     plan = {
@@ -288,6 +292,8 @@ def cmd_tasks_bulk(client, args):
         return _tasks_bulk_move(client, args)
     if args.subcommand == "tags":
         return _tasks_bulk_tags(client, args)
+    if args.subcommand == "archive":
+        return _tasks_bulk_archive(client, args)
     error(f"Unknown tasks bulk subcommand: {args.subcommand}")
 
 
@@ -339,6 +345,33 @@ def _tasks_bulk_move(client, args):
             if not args.continue_on_error:
                 return _bulk_result("bulk_move", completed, failed, task_ids[index:], task_id)
     return _bulk_result("bulk_move", completed, failed, [], None)
+
+
+def _tasks_bulk_archive(client, args):
+    task_ids = _bulk_task_ids(args)
+    archived = not getattr(args, "unarchive", False)
+    action = "bulk_archive" if archived else "bulk_unarchive"
+    body = {"archived": archived}
+    if client.dry_run:
+        return {
+            "dry_run": True,
+            "action": action,
+            "task_ids": task_ids,
+            "put_body": body,
+            "continue_on_error": args.continue_on_error,
+        }
+
+    completed = []
+    failed = []
+    for index, task_id in enumerate(task_ids):
+        try:
+            client.put_v2(f"/task/{task_id}", data=dict(body))
+            completed.append(task_id)
+        except Exception as exc:  # noqa: BLE001 - bulk output must report API failure details
+            failed.append({"task_id": task_id, "error": str(exc)})
+            if not args.continue_on_error:
+                return _bulk_result(action, completed, failed, task_ids[index:], task_id)
+    return _bulk_result(action, completed, failed, [], None)
 
 
 def _load_bulk_tag_plan(plan_file):

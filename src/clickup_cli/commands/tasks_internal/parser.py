@@ -375,7 +375,8 @@ notes:
 Update one or more fields on an existing task. This is a mutating command.
 
 Core fields are sent in one PUT request: --name, --status, --priority
-(or --clear-priority), --desc / --desc-file, plus assignee diffs
+(or --clear-priority), --desc / --desc-file, archive state
+(--archive / --unarchive), plus assignee diffs
 (--add-assignee / --remove-assignee).
 
 Tag changes run as extra POST/DELETE calls (one per tag) because the
@@ -404,11 +405,15 @@ examples:
   clickup tasks update abc123 --add-tag "in review" --remove-tag "draft"
   clickup tasks update abc123 --add-assignee 12345 --remove-assignee 67890
   clickup tasks update abc123 --custom-field abc-uuid=high --custom-field xyz-uuid=42
+  clickup tasks update abc123 --archive
+  clickup tasks update abc123 --unarchive
   clickup --dry-run tasks update abc123 --add-tag urgent
 
 notes:
   --desc and --desc-file are mutually exclusive. Using both is an error.
   --priority and --clear-priority are mutually exclusive. Using both is an error.
+  --archive and --unarchive are mutually exclusive. Using both is an error.
+  --archive alone is a valid update: it sends archived: true in the PUT body.
   Tag names are auto-lowercased.
   --custom-field values are sent as strings; the ClickUp API coerces
   them to the field's declared type.""",
@@ -432,6 +437,17 @@ notes:
     )
     tu.add_argument(
         "--desc-file", type=str, help="Path to a file containing description content"
+    )
+    archive_update = tu.add_mutually_exclusive_group()
+    archive_update.add_argument(
+        "--archive",
+        action="store_true",
+        help="Archive the task by sending archived: true",
+    )
+    archive_update.add_argument(
+        "--unarchive",
+        action="store_true",
+        help="Restore an archived task by sending archived: false",
     )
     tu.add_argument(
         "--add-assignee",
@@ -757,7 +773,9 @@ details for live failures.""",
 examples:
   clickup --dry-run tasks bulk move --task-id abc --task-id def --to <space-or-list-id>
   clickup tasks bulk move --task-file ids.txt --to <space-or-list-id>
-  clickup --dry-run tasks bulk tags --plan bulk-tags.json""",
+  clickup --dry-run tasks bulk tags --plan bulk-tags.json
+  clickup --dry-run tasks bulk archive --task-id abc --task-id def
+  clickup tasks bulk archive --task-file ids.txt --unarchive""",
     )
     tb_sub = tb.add_subparsers(dest="subcommand", required=True)
 
@@ -785,6 +803,39 @@ Expected shape: {"tasks": [{"task_id": "...", "operations": [{"action": "add|rem
     )
     tbt.add_argument("--plan", required=True, dest="plan_file", help="Path to bulk tag JSON plan")
     tbt.add_argument("--continue-on-error", action="store_true", help="Continue after per-task failures")
+
+    tba = tb_sub.add_parser(
+        "archive",
+        formatter_class=F,
+        help="Archive (or unarchive) multiple tasks",
+        description="""\
+Archive multiple tasks by sending archived: true to PUT /task/{task_id}, one
+request per task. Accepts repeated --task-id values and/or a newline-delimited
+--task-file. Add --unarchive to send archived: false instead. Live runs stop on
+first failure unless --continue-on-error is set.""",
+        epilog="""\
+returns:
+  On --dry-run: {"dry_run": true, "action": "bulk_archive"|"bulk_unarchive",
+  "task_ids": [...], "put_body": {"archived": true|false},
+  "continue_on_error": bool} with zero API calls.
+  On live runs: completed/failed task IDs plus `remaining` and `resume_from`
+  so an interrupted batch can be restarted from the failing task.
+
+examples:
+  clickup --dry-run tasks bulk archive --task-id abc --task-id def
+  clickup tasks bulk archive --task-file ids.txt
+  clickup tasks bulk archive --task-file ids.txt --unarchive --continue-on-error""",
+    )
+    tba.add_argument(
+        "--task-id", dest="task_ids", action="append", help="Task ID to archive (repeatable)"
+    )
+    tba.add_argument("--task-file", help="Path to newline-delimited task IDs")
+    tba.add_argument(
+        "--unarchive",
+        action="store_true",
+        help="Restore the tasks instead of archiving them (sends archived: false)",
+    )
+    tba.add_argument("--continue-on-error", action="store_true", help="Continue after per-task failures")
 
     # tasks depend — subcommand group for dependency CRUD
     tdp = tasks_sub.add_parser(
