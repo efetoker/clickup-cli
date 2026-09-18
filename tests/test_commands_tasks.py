@@ -378,6 +378,40 @@ class TasksUpdateBehaviorTests(unittest.TestCase):
         body = client.calls[-1]["data"]
         self.assertIsNone(body["priority"])
 
+    def test_update_archive_alone_sends_archived_true(self):
+        client = FlexClient(responses={"/task/": {"id": "t1", "archived": True}})
+        args = Namespace(task_id="t1", name=None, status=None,
+                         desc=None, desc_file=None, priority=None,
+                         archive=True, unarchive=False)
+
+        cmd_tasks_update(client, args)
+
+        self.assertEqual(client.calls[-1]["method"], "PUT")
+        self.assertEqual(client.calls[-1]["data"], {"archived": True})
+
+    def test_update_unarchive_dry_run_plans_archived_false(self):
+        client = FlexClient(dry_run=True)
+        args = Namespace(task_id="t1", name=None, status=None,
+                         desc=None, desc_file=None, priority=None,
+                         archive=False, unarchive=True)
+
+        result = cmd_tasks_update(client, args)
+
+        self.assertEqual(result["put_body"], {"archived": False})
+        self.assertEqual(client.calls, [])
+
+    def test_update_archive_merges_into_existing_put_body(self):
+        client = FlexClient(responses={"/task/": {"id": "t1"}})
+        args = Namespace(task_id="t1", name=None, status="complete",
+                         desc=None, desc_file=None, priority=None,
+                         archive=True, unarchive=False)
+
+        cmd_tasks_update(client, args)
+
+        put_calls = [call for call in client.calls if call["method"] == "PUT"]
+        self.assertEqual(len(put_calls), 1)
+        self.assertEqual(put_calls[0]["data"], {"status": "complete", "archived": True})
+
     def test_update_empty_body_errors(self):
         client = FlexClient()
         args = Namespace(task_id="t1", name=None, status=None,
@@ -1369,6 +1403,84 @@ class TasksBulkTests(unittest.TestCase):
         self.assertEqual(result["failed"], [{"task_id": "b", "error": "boom"}])
         self.assertIsNone(result["resume_from"])
         self.assertEqual(client.put_v3.call_count, 3)
+
+    def test_bulk_archive_dry_run_combines_ids_and_file(self):
+        client = FlexClient(dry_run=True)
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            handle.write("file-1\n\nfile-2\n")
+            handle.flush()
+            result = tasks_commands.cmd_tasks_bulk(
+                client,
+                Namespace(
+                    subcommand="archive",
+                    task_ids=["arg-1"],
+                    task_file=handle.name,
+                    unarchive=False,
+                    continue_on_error=False,
+                ),
+            )
+
+        self.assertEqual(result["action"], "bulk_archive")
+        self.assertEqual(result["task_ids"], ["arg-1", "file-1", "file-2"])
+        self.assertEqual(result["put_body"], {"archived": True})
+        self.assertEqual(client.calls, [])
+
+    def test_bulk_archive_live_puts_archived_true_per_task(self):
+        client = FlexClient(responses={"/task/": {"id": "x"}})
+        args = Namespace(
+            subcommand="archive",
+            task_ids=["a", "b"],
+            task_file=None,
+            unarchive=False,
+            continue_on_error=False,
+        )
+
+        result = tasks_commands.cmd_tasks_bulk(client, args)
+
+        self.assertEqual(result["completed"], ["a", "b"])
+        self.assertEqual(
+            client.calls,
+            [
+                {"method": "PUT", "path": "/task/a", "data": {"archived": True}},
+                {"method": "PUT", "path": "/task/b", "data": {"archived": True}},
+            ],
+        )
+
+    def test_bulk_archive_unarchive_sends_archived_false(self):
+        client = FlexClient(responses={"/task/": {"id": "x"}})
+        args = Namespace(
+            subcommand="archive",
+            task_ids=["a"],
+            task_file=None,
+            unarchive=True,
+            continue_on_error=False,
+        )
+
+        result = tasks_commands.cmd_tasks_bulk(client, args)
+
+        self.assertEqual(result["action"], "bulk_unarchive")
+        self.assertEqual(client.calls[0]["data"], {"archived": False})
+
+    def test_bulk_archive_stops_on_first_failure_with_resume_details(self):
+        client = MagicMock()
+        client.dry_run = False
+        client.put_v2.side_effect = [{"id": "a"}, RuntimeError("boom")]
+        args = Namespace(
+            subcommand="archive",
+            task_ids=["a", "b", "c"],
+            task_file=None,
+            unarchive=False,
+            continue_on_error=False,
+        )
+
+        result = tasks_commands.cmd_tasks_bulk(client, args)
+
+        self.assertEqual(result["status"], "partial_failure")
+        self.assertEqual(result["completed"], ["a"])
+        self.assertEqual(result["failed"], [{"task_id": "b", "error": "boom"}])
+        self.assertEqual(result["remaining"], ["b", "c"])
+        self.assertEqual(result["resume_from"], "b")
+        self.assertEqual(client.put_v2.call_count, 2)
 
     def test_bulk_tags_dry_run_reads_plan(self):
         client = FlexClient(dry_run=True)

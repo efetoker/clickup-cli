@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## 1.9.0 (2026-09-18)
 
+- **Task archiving is now a first-class write operation.** `tasks update --archive` / `--unarchive` send `archived: true|false` inside the existing core-field PUT body (no extra request), the two flags are mutually exclusive, and either one is a complete update on its own — no other mutable flag is required.
+- **New `tasks bulk archive` command.** Archive or restore many tasks from repeated `--task-id` values and/or a newline-delimited `--task-file`, with `--unarchive` for the reverse direction. It follows the existing bulk contract: `--dry-run` returns a structural plan with zero API calls, live runs stop on the first failure unless `--continue-on-error` is set, and failures come back with `failed`, `remaining`, and `resume_from` details.
 - **`tasks create` can now create real subtasks.** A new `--parent <task_id>` flag (alias `--parent-id`) sets the API `parent` field so the new task is created as a subtask of an existing task in the same list. `--dry-run` shows the `parent` linkage in the request body.
 
 ## 1.8.0 (2026-04-26)
