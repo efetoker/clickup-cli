@@ -12,6 +12,7 @@ src/clickup_cli/
 ├── client.py        # ClickUpClient API wrapper (rate limiting, dry-run, debug)
 ├── config.py        # Config loader (lazy, fallback chain, workspace auto-detect)
 ├── helpers.py       # output(), error(), compact_task(), add_id_argument(), etc.
+├── tag_validation.py # strict-tag flags, config default, space tag inventory checks
 └── commands/
     ├── __init__.py  # COMMAND_MANIFESTS registry + derived HANDLERS map
     ├── backup.py    # shared backup helpers used by list/folder backups
@@ -28,7 +29,7 @@ src/clickup_cli/
     ├── lists.py     # lists parser + handlers (list/get/create/update/delete/backup/privacy)
     ├── privacy.py   # shared privacy toggle helpers
     ├── spaces.py    # spaces parser + handlers (list/get/create/update/delete/statuses/privacy)
-    ├── tags.py      # tags parser + handlers (list/create/delete/usage/add/remove)
+    ├── tags.py      # tags parser + handlers (list/create/edit/migrate/delete/usage/add/remove)
     ├── task_types.py # workspace custom task type discovery
     ├── team.py      # team parser + handlers (whoami/members)
     └── init.py      # clickup init setup command
@@ -80,6 +81,8 @@ tests/
 ├── test_commands_metadata.py              # fields/task-types handlers
 ├── test_commands_spaces_lists_folders.py  # spaces/lists/folders handlers
 ├── test_commands_misc.py                  # tags/team/init coverage
+├── test_tag_features.py                   # strict tags, tags edit, tags migrate, bulk tag failures
+├── test_task_filters.py                   # text search, tag/due-date filters, limits, timezones
 ├── test_tasks_facade.py                   # tasks facade -> tasks_internal regression coverage
 ├── test_config.py                         # config loading
 └── test_helpers.py                        # helpers and pagination utilities
@@ -104,7 +107,8 @@ The canonical human workflow lives in [CONTRIBUTING.md](CONTRIBUTING.md#adding-a
 - Help text must be self-sufficient — an agent should use `--help` to discover correct usage
 - No workspace-specific values in help text or source code
 - Stdout is always JSON. Errors and warnings go to stderr.
-- Every mutation supports `--dry-run`
+- Every mutation supports `--dry-run`. A preview may use safe GET lookups to read live state, but it must make zero mutating calls; tests should assert that distinction
+- `tags migrate` reuses the bulk-tag executor; keep its `completed`/`failed`/`remaining`/`resume_from` contract in one place
 - Config is lazy-loaded — the `init` command works without any config file
 
 ## Automations
