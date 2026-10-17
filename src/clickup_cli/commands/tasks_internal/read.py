@@ -9,22 +9,24 @@ from .shared import (
     _TASK_ID_PATTERN,
     DEFAULT_TASK_PAGE_BUDGET,
     _budget_metadata,
-    _filter_by_tags,
+    _filter_task_results,
     _format_and_wrap,
     _paginate_tasks,
     _parse_fields,
     _parse_search_custom_fields,
     _resolve_list_id,
     _resolve_scope_list_ids,
+    _task_filter_params,
 )
 
 
 def cmd_tasks_list(client, args):
+    filter_params = _task_filter_params(args)
     list_id = _resolve_list_id(args, client=client)
     if client.dry_run:
         return {"dry_run": True, "action": "list_tasks", "list_id": list_id}
 
-    params = {"archived": "false"}
+    params = {"archived": "false", **filter_params}
     if args.include_closed:
         params["include_closed"] = "true"
     if args.status:
@@ -54,7 +56,7 @@ def cmd_tasks_list(client, args):
         total_pages += archived_result["pages_fetched"]
         complete = complete and archived_result["complete"]
 
-    result = _format_and_wrap(all_tasks, args)
+    result = _format_and_wrap(_filter_task_results(all_tasks, args), args)
     result.update(_budget_metadata(total_pages, complete))
     return result
 
@@ -128,6 +130,7 @@ def cmd_tasks_search(client, args):
     only source of matches. Tag filters are also applied client-side here, after
     the API search results are merged.
     """
+    filter_params = _task_filter_params(args)
     resolved_space_list_ids = None
     if args.space and not getattr(args, "list_id", None) and not getattr(args, "folder_id", None):
         resolved_space_list_ids = _resolve_scope_list_ids(
@@ -143,7 +146,7 @@ def cmd_tasks_search(client, args):
     if not name_prefix and _TASK_ID_PATTERN.match(args.query):
         name_prefix = args.query
 
-    params = {"search": args.query}
+    params = dict(filter_params)
     if args.include_closed:
         params["include_closed"] = "true"
     custom_fields = _parse_search_custom_fields(getattr(args, "custom_fields", None))
@@ -211,10 +214,15 @@ def cmd_tasks_search(client, args):
             if task.get("name", "").startswith(name_prefix)
         ]
 
-    tag_filter = getattr(args, "tags", None)
-    if tag_filter:
-        all_tasks = _filter_by_tags(all_tasks, tag_filter)
+    words = args.query.casefold().split()
+    if words:
+        all_tasks = [
+            task for task in all_tasks
+            if all(word in " ".join(str(task.get(key) or "") for key in
+                                    ("name", "description", "text_content")).casefold()
+                   for word in words)
+        ]
 
-    result = _format_and_wrap(all_tasks, args)
+    result = _format_and_wrap(_filter_task_results(all_tasks, args), args)
     result.update(_budget_metadata(total_pages, complete))
     return result

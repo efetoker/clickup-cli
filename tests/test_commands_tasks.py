@@ -447,7 +447,7 @@ class TasksUpdateExpandedFieldsTests(unittest.TestCase):
             add_tags=["Urgent", "In Review"]))
         post_calls = [c for c in client.calls if c["method"] == "POST"]
         tag_names = [c["path"].rsplit("/", 1)[-1] for c in post_calls]
-        self.assertEqual(tag_names, ["urgent", "in review"])
+        self.assertEqual(tag_names, ["urgent", "in%20review"])
 
     def test_tag_remove_issues_delete_per_tag(self):
         client = FlexClient(responses={"/task/t1": {"id": "t1"}})
@@ -696,7 +696,7 @@ class TasksCreateBehaviorTests(unittest.TestCase):
             [
                 "/list/222/task",
                 "/task/task-1/tag/urgent",
-                "/task/task-1/tag/in review",
+                "/task/task-1/tag/in%20review",
                 "/task/task-1",
             ],
         )
@@ -1748,7 +1748,7 @@ class TasksIncludeArchivedTests(unittest.TestCase):
                 {"tasks": [{"id": "z1", "name": "Archived 1", "status": {"status": "open"}, "priority": None, "url": "u3"}], "last_page": False},
             ]
         })
-        args = Namespace(query="bug", include_closed=False,
+        args = Namespace(query="", include_closed=False,
                          include_archived=True, space=None, list_id=None,
                          folder_id=None, name_prefix=None, tags=None,
                          fields=None, full=False, all_pages=False)
@@ -1820,7 +1820,7 @@ class TasksIncludeArchivedTests(unittest.TestCase):
             }
         )
         args = Namespace(
-            query="bug",
+            query="",
             include_closed=False,
             include_archived=True,
             space="111",
@@ -1888,7 +1888,7 @@ class TasksIncludeArchivedTests(unittest.TestCase):
             }
         )
         args = Namespace(
-            query="bug",
+            query="",
             include_closed=False,
             include_archived=True,
             space="111",

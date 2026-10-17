@@ -219,7 +219,7 @@ class CliArgumentTests(unittest.TestCase):
     def test_root_help_lists_all_tag_subcommands(self):
         help_text = cli.build_parser().format_help()
 
-        self.assertIn("tags      — list, create, delete, usage, add, remove", help_text)
+        self.assertIn("tags      - list, create, edit, migrate, delete, usage, add, remove", help_text)
 
     def test_root_help_documents_positional_flag_aliases(self):
         help_text = cli.build_parser().format_help()
@@ -1144,6 +1144,7 @@ class TasksListPaginationTests(unittest.TestCase):
                         {
                             "id": "t1",
                             "name": "Tagged task",
+                            "tags": [{"name": "urgent"}, {"name": "in review"}],
                             "status": {"status": "open"},
                             "priority": None,
                             "url": "u1",

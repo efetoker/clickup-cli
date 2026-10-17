@@ -3,6 +3,7 @@
 import argparse
 
 from ...helpers import add_id_argument
+from ...tag_validation import add_strict_tag_flags
 
 
 def _positive_int(value):
@@ -14,6 +15,21 @@ def _positive_int(value):
     if number < 1:
         raise argparse.ArgumentTypeError("must be a positive integer")
     return number
+
+
+def _add_read_filters(parser):
+    parser.add_argument("--untagged", action="store_true",
+                        help="Keep tasks with no tags; cannot combine with --tag")
+    parser.add_argument("--exclude-tag", dest="exclude_tags", action="append", metavar="TAG",
+                        help="Exclude tasks with any named tag (repeatable, case-insensitive)")
+    parser.add_argument("--due-before", metavar="YYYY-MM-DD",
+                        help="Due before this local date, excluding the entire boundary day")
+    parser.add_argument("--due-after", metavar="YYYY-MM-DD",
+                        help="Due after this local date, excluding the entire boundary day")
+    parser.add_argument("--overdue", action="store_true",
+                        help="Due strictly before now, excluding done/closed tasks and missing due dates")
+    parser.epilog += ("\n  Date filters use the system-local timezone. Filters combine before --limit.\n"
+                      "  Completeness metadata describes the scan, not the output cap.\n")
 
 
 
@@ -176,6 +192,8 @@ notes:
     )
 
     # tasks get
+    _add_read_filters(tl)
+
     tg = tasks_sub.add_parser(
         "get",
         formatter_class=F,
@@ -486,6 +504,9 @@ notes:
     )
 
     # tasks search
+    add_strict_tag_flags(tc)
+    add_strict_tag_flags(tu)
+
     ts = tasks_sub.add_parser(
         "search",
         formatter_class=F,
@@ -504,7 +525,12 @@ include tasks from all spaces.
 
 When the query looks like a task ID (e.g. PROJ-39, PROJ-12), --name-prefix
 is auto-applied to filter exact matches. Use --name-prefix explicitly for
-other prefix-based filtering.""",
+other prefix-based filtering.
+
+Text matching is client-side and case-insensitive: every whitespace-separated
+word must occur in the name or returned description/text content. No comments,
+phrase syntax, regex, or fuzzy matching. An empty query matches all tasks.
+Text matching and any name prefix are combined before --limit.""",
         epilog="""\
 returns:
   {"tasks": [...], "count": N}
@@ -604,6 +630,8 @@ notes:
     )
 
     # tasks delete
+    _add_read_filters(ts)
+
     td = tasks_sub.add_parser(
         "delete",
         formatter_class=F,
@@ -803,6 +831,7 @@ Expected shape: {"tasks": [{"task_id": "...", "operations": [{"action": "add|rem
     )
     tbt.add_argument("--plan", required=True, dest="plan_file", help="Path to bulk tag JSON plan")
     tbt.add_argument("--continue-on-error", action="store_true", help="Continue after per-task failures")
+    add_strict_tag_flags(tbt)
 
     tba = tb_sub.add_parser(
         "archive",

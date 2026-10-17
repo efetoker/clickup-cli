@@ -52,6 +52,40 @@ class FieldsCommandTests(unittest.TestCase):
         self.assertEqual(client.calls[0]["path"], "/list/222/field")
 
 
+class FieldScopeTests(unittest.TestCase):
+    def test_new_scopes_use_their_actual_endpoints(self):
+        from clickup_cli.commands.fields import cmd_fields_list
+
+        for options, path, scope in [
+            ({"space": "testspace", "space_level": True}, "/space/111/field",
+             {"type": "space", "space": "testspace", "resolved_space_id": "111"}),
+            ({"folder_id": "folder-example"}, "/folder/folder-example/field",
+             {"type": "folder", "resolved_folder_id": "folder-example"}),
+            ({"workspace": True}, "/team/test_workspace/field",
+             {"type": "workspace", "resolved_workspace_id": "test_workspace"}),
+        ]:
+            with self.subTest(options=options):
+                client = FlexClient(responses={path: {"fields": []}})
+                result = cmd_fields_list(client, Namespace(**options))
+                self.assertEqual(result, {"fields": [], "count": 0, "scope": scope})
+                self.assertEqual(client.calls[0]["path"], path)
+
+    def test_new_scope_conflicts_fail_without_requests(self):
+        from clickup_cli.commands.fields import cmd_fields_list
+
+        for options in [
+            {"space_level": True},
+            {"space_level": True, "space": "testspace", "list_id": "list-example"},
+            {"workspace": True, "space": "testspace"},
+            {"folder_id": "folder-example", "list_id": "list-example"},
+            {"folder_id": "folder-example", "workspace": True},
+        ]:
+            client = FlexClient()
+            with self.subTest(options=options), self.assertRaises(SystemExit):
+                cmd_fields_list(client, Namespace(**options))
+            self.assertEqual(client.calls, [])
+
+
 class TaskTypesCommandTests(unittest.TestCase):
     def test_task_types_list_reports_workspace_only_scope(self):
         from clickup_cli.commands.task_types import cmd_task_types_list
