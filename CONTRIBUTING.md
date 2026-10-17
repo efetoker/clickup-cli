@@ -27,6 +27,8 @@ Current suite shape:
 - `tests/test_commands_metadata.py` — fields and task-types metadata commands
 - `tests/test_commands_spaces_lists_folders.py` — spaces, lists, folders, privacy
 - `tests/test_commands_misc.py` — tags, team, init, misc dispatch coverage
+- `tests/test_tag_features.py`: strict tag validation, tag editing, map-driven migration, bulk tag failure handling
+- `tests/test_task_filters.py`: text search matching, tag and due-date filters, limits, pagination, timezone edges
 - `tests/test_config.py` — config loading and fallback rules
 - `tests/test_helpers.py` — stdout/stderr helpers, task formatting, pagination helpers
 - `tests/test_tasks_facade.py` — task facade exports

@@ -12,7 +12,8 @@ disable-model-invocation: true
 
 - Do not publish to PyPI, push tags, push branches, or create GitHub Releases without explicit maintainer confirmation.
 - Before changing the version, verify the current git/PyPI tag state described in `RELEASE.md`.
-- When bumping the version, update both `src/clickup_cli/__init__.py` and `tests/test_cli.py::test_version_flag`.
+- When bumping the version, update `src/clickup_cli/__init__.py` only. `tests/test_cli.py::test_version_flag` reads the package version and needs no literal edit.
+- Stage release files by name; never use `git add -A` or `git add .`.
 - Run the full pre-flight from `RELEASE.md`: `ruff check src/ tests/`, `pytest -v`, and `scripts/validate-cli-output.sh`.
 - Build artifacts with `python -m build` and validate with `python -m twine check dist/*` before any publish/push step.
 

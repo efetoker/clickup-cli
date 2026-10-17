@@ -30,6 +30,7 @@
 - `tasks create` can infer `--space` from `--list`
 - `tasks search --space` scopes to the full space by expanding to the lists in that space
 - `fields list --space` inspects the configured default list for that space, or the first folderless list if no default `list_id` is configured; use `--list` for folder-contained lists
+- `fields list --space <space> --space-level`, `--folder <id>`, and `--workspace` read fields defined at that level; they are not recursive inventories of lower levels
 - `task-types list` is workspace-scoped; `--space` and `--list` are echoed in `scope` only and do not filter results
 - `clickup init` generates space aliases by lowercasing space names and replacing spaces with hyphens; it stores `space_id` values but no default `list_id` values
 
@@ -38,6 +39,10 @@
 - Validate response metadata instead of assuming a default scan is exhaustive
 - Use `--dry-run` before automating mutations in a new environment
 - Use `tasks bulk ...` and backup commands for migration workflows that need resumable failure output or local JSON snapshots
+- Use `tags migrate --map <file>` for Space-wide tag merges and drops; it scans closed, archived, and subtask items and refuses incomplete scans
+- Pass `--strict-tags`, or set `"strict_tags": true` in the config, so automation cannot create Space tags implicitly through typos
+- `tasks search` text matching is client-side over task names and descriptions; with a bounded default scan, an empty result is only exhaustive when `results_complete` is true
+- Dry-run previews may perform GET requests to read live state, but never mutating requests
 - List backups contain `list.json`, `tasks.json`, `tasks/<task_id>.json`, and `manifest.json`; folder backups contain `folder.json`, nested list backups, and a folder `manifest.json`
 - Treat doc IDs and page IDs as different values
 

@@ -27,6 +27,8 @@ clickup <group> --help 2>/dev/null
 clickup --dry-run <group> <subcommand> <required-args> 2>/dev/null
 ```
 
+   Stateful previews such as `tags edit`, `tags migrate`, and strict tag checks read live state even in dry-run, so dummy arguments against the real API are not an offline check for them. Cover those with synthetic fake API responses in the test suite and assert valid JSON plus zero mutating requests.
+
 4. Validate that stdout is valid JSON by piping through `python3 -c "import sys,json; json.load(sys.stdin)"`.
 
 5. For read-only commands (list, get, search), run with `--help` and verify the help text renders without errors.

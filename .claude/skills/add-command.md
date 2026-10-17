@@ -15,6 +15,7 @@ description: Step-by-step workflow for adding a new CLI command to clickup-cli, 
 - Use `add_id_argument()` for positional IDs so both positional and `--flag` forms work.
 - Make `--help` self-sufficient with examples, return-shape notes, and dry-run guidance for mutating commands.
 - Add focused tests in the relevant split test module under `tests/`; use `tests/test_commands_metadata.py` for `fields` and `task-types`.
+- A dry-run preview may need safe GET lookups to read live state. Tests must tell zero mutating requests apart from zero total requests, and must show that validation rejects bad input before any mutation.
 - If the command adds a new workflow pattern, update `.claude/skills/clickup-cli.md` with a usage example.
 
 ## Verification
