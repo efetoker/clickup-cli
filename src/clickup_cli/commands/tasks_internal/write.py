@@ -2,9 +2,20 @@
 
 import json
 import re
+import sys
+from contextlib import redirect_stderr
 from datetime import datetime, timezone
+from io import StringIO
+from urllib.parse import quote
 
 from ...helpers import error, read_content
+from ...tag_validation import (
+    space_for_list,
+    space_for_task,
+    strict_tags_enabled,
+    validate_space_tags,
+    validate_task_tag_plan,
+)
 from .shared import (
     _first_folderless_list_id,
     _infer_space_from_list,
@@ -136,6 +147,9 @@ def cmd_tasks_create(client, args):
     if parent:
         body["parent"] = parent
 
+    if tags and strict_tags_enabled(client, args):
+        validate_space_tags(client, space_for_list(client, list_id), tags)
+
     if client.dry_run:
         if custom_fields or task_type or tags:
             return {
@@ -164,7 +178,7 @@ def cmd_tasks_create(client, args):
         client.post_v2(f"/task/{result['id']}/field/{field_id}", data={"value": value})
 
     for tag in tags:
-        client.post_v2(f"/task/{result['id']}/tag/{tag}", data={})
+        client.post_v2(f"/task/{result['id']}/tag/{quote(tag, safe='')}", data={})
 
     if custom_fields or tags:
         return client.get_v2(f"/task/{result['id']}")
@@ -234,6 +248,9 @@ def cmd_tasks_update(client, args):
         "custom_fields": [{"field_id": field_id, "value": value} for field_id, value in custom_fields],
     }
 
+    if add_tags and strict_tags_enabled(client, args):
+        validate_space_tags(client, space_for_task(client, args.task_id), add_tags)
+
     if client.dry_run:
         return {"dry_run": True, "action": "update_task", **plan}
 
@@ -242,9 +259,9 @@ def cmd_tasks_update(client, args):
         result = client.put_v2(f"/task/{args.task_id}", data=body)
 
     for tag in add_tags:
-        client.post_v2(f"/task/{args.task_id}/tag/{tag}", data={})
+        client.post_v2(f"/task/{args.task_id}/tag/{quote(tag, safe='')}", data={})
     for tag in remove_tags:
-        client.delete_v2(f"/task/{args.task_id}/tag/{tag}")
+        client.delete_v2(f"/task/{args.task_id}/tag/{quote(tag, safe='')}")
 
     for field_id, value in custom_fields:
         client.post_v2(f"/task/{args.task_id}/field/{field_id}", data={"value": value})
@@ -375,8 +392,11 @@ def _tasks_bulk_archive(client, args):
 
 
 def _load_bulk_tag_plan(plan_file):
-    with open(plan_file, encoding="utf-8") as handle:
-        plan = json.load(handle)
+    try:
+        with open(plan_file, encoding="utf-8") as handle:
+            plan = json.load(handle)
+    except (OSError, ValueError) as exc:
+        error(f"Invalid bulk tag plan: {exc}")
     tasks = plan.get("tasks") if isinstance(plan, dict) else None
     if not isinstance(tasks, list) or not tasks:
         error("Invalid bulk tag plan: tasks must be a non-empty list")
@@ -386,7 +406,7 @@ def _load_bulk_tag_plan(plan_file):
         if not isinstance(task, dict):
             error(f"Invalid bulk tag plan: task #{task_index} must be an object")
         task_id = task.get("task_id")
-        if not task_id:
+        if not isinstance(task_id, str) or not task_id.strip():
             error(f"Invalid bulk tag plan: task #{task_index} is missing task_id")
 
         raw_operations = task.get("operations")
@@ -410,7 +430,7 @@ def _load_bulk_tag_plan(plan_file):
                 )
 
             tag = op.get("tag", "")
-            if not tag:
+            if not isinstance(tag, str) or not tag.strip():
                 error(
                     f"Invalid bulk tag plan: task {task_id} operation #{op_index} "
                     "is missing tag"
@@ -422,6 +442,8 @@ def _load_bulk_tag_plan(plan_file):
 
 def _tasks_bulk_tags(client, args):
     plan = _load_bulk_tag_plan(args.plan_file)
+    if strict_tags_enabled(client, args):
+        validate_task_tag_plan(client, plan)
     if client.dry_run:
         return {
             "dry_run": True,
@@ -430,26 +452,35 @@ def _tasks_bulk_tags(client, args):
             "continue_on_error": args.continue_on_error,
         }
 
+    return _execute_bulk_tag_plan(client, plan, args.continue_on_error)
+
+
+def _execute_bulk_tag_plan(client, plan, continue_on_error=False):
+    """Apply ordered tag operations, retaining CLI API failures in the result."""
     task_ids = [task.get("task_id") for task in plan["tasks"]]
     completed = []
     failed = []
     for index, task in enumerate(plan["tasks"]):
         task_id = task.get("task_id")
+        messages = StringIO()
         try:
-            for operation in task.get("operations", []):
-                action = operation.get("action")
-                tag = operation.get("tag")
-                if action == "add":
-                    client.post_v2(f"/task/{task_id}/tag/{tag}", data={})
-                elif action == "remove":
-                    client.delete_v2(f"/task/{task_id}/tag/{tag}")
-                else:
-                    error(f"Invalid bulk tag action for task {task_id}: {action}")
+            with redirect_stderr(messages):
+                for operation in task.get("operations", []):
+                    action = operation.get("action")
+                    tag = quote(operation["tag"], safe="")
+                    if action == "add":
+                        client.post_v2(f"/task/{task_id}/tag/{tag}", data={})
+                    elif action == "remove":
+                        client.delete_v2(f"/task/{task_id}/tag/{tag}")
+                    else:
+                        error(f"Invalid bulk tag action for task {task_id}: {action}")
             completed.append(task_id)
-        except Exception as exc:  # noqa: BLE001 - bulk output must report API failure details
-            failed.append({"task_id": task_id, "error": str(exc)})
-            if not args.continue_on_error:
+        except (Exception, SystemExit) as exc:  # noqa: BLE001 - retain per-task API failures
+            failed.append({"task_id": task_id, "error": messages.getvalue().strip() or str(exc)})
+            if not continue_on_error:
                 return _bulk_result("bulk_tags", completed, failed, task_ids[index:], task_id)
+        finally:
+            sys.stderr.write(messages.getvalue())
     return _bulk_result("bulk_tags", completed, failed, [], None)
 
 

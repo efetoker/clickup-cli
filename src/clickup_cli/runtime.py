@@ -8,3 +8,4 @@ class RuntimeContext:
     workspace_id: str
     user_id: str = ""
     spaces: dict = field(default_factory=dict)
+    strict_tags: bool = False

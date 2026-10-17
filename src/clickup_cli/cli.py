@@ -70,7 +70,7 @@ current coverage:
   lists     — list, get, create, update, delete, privacy
   spaces    — list, get, create, update, delete, statuses, privacy
   team      — whoami, members
-  tags      — list, create, delete, usage, add, remove
+  tags      - list, create, edit, migrate, delete, usage, add, remove
   task-types — list
 
 Use <group> --help for details on each group.""",
@@ -169,10 +169,14 @@ def main():
             "No API token found. Set CLICKUP_API_TOKEN or run: clickup init"
         )
 
+    strict_tags = config.get("strict_tags", False)
+    if not isinstance(strict_tags, bool):
+        error("Config strict_tags must be true or false")
     runtime = RuntimeContext(
         workspace_id=str(config.get("workspace_id", "")),
         user_id=str(config.get("user_id", "")),
         spaces=config.get("spaces", {}),
+        strict_tags=strict_tags,
     )
 
     client = ClickUpClient(
