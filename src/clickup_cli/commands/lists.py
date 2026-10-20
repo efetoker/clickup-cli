@@ -1,6 +1,12 @@
 """List command handlers — list, get, create, update, delete, privacy."""
 
-from ..helpers import add_id_argument, error, read_content, resolve_space_id
+from ..helpers import (
+    add_id_argument,
+    error,
+    list_with_archived,
+    read_content,
+    resolve_space_id,
+)
 from .backup import backup_list, backup_options, count_list_tasks
 from .privacy import handle_privacy_request, register_privacy_subcommand
 
@@ -48,21 +54,31 @@ List lists in a specific context. Exactly one of --folder or --space
 is required:
 
   --folder <id>   — lists all lists inside a folder
-  --space <name>  — lists only folderless lists in a space""",
+  --space <name>  — lists only folderless lists in a space
+
+Archived lists are hidden unless --include-archived is set.""",
         epilog="""\
 returns:
   {"lists": [...], "count": N}
 
+  Each list has an "archived" boolean.
+
 examples:
   clickup lists list --folder 12345
   clickup lists list --space <name>
+  clickup lists list --space <name> --include-archived
   clickup --pretty lists list --space <name>
 
 notes:
   --folder and --space are mutually exclusive.
   --space only returns folderless lists. To see lists inside folders,
   use 'folders list --space <name>' first to find folder IDs, then
-  'lists list --folder <id>' for each folder.""",
+  'lists list --folder <id>' for each folder.
+  Folderless lists of an archived space stay hidden even with
+  --include-archived: ClickUp keeps them in a hidden folder that the
+  space list endpoint does not return. To find them, use the team task
+  filter (GET /team/{team_id}/task?space_ids[]=<space_id>&archived=true)
+  and read list.id from each returned task.""",
     )
     ll_target = ll.add_mutually_exclusive_group(required=True)
     ll_target.add_argument(
@@ -76,6 +92,12 @@ notes:
         metavar="SPACE_NAME_OR_ID",
         type=str,
         help="Space name (from config) or raw ClickUp space ID — list folderless lists",
+    )
+    ll.add_argument(
+        "--include-archived",
+        action="store_true",
+        dest="include_archived",
+        help="Include archived lists (makes a second API call and merges results)",
     )
 
     # lists get
@@ -274,9 +296,9 @@ def _resolve_list_parent(args):
 def cmd_lists_list(client, args):
     """List lists in a folder or folderless lists in a space."""
     path, _ = _resolve_list_parent(args)
-    resp = client.get_v2(path)
-    lists = resp.get("lists", [])
-    return {"lists": lists, "count": len(lists)}
+    return list_with_archived(
+        client, path, "lists", include_archived=getattr(args, "include_archived", False)
+    )
 
 
 def cmd_lists_get(client, args):

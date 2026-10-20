@@ -153,6 +153,7 @@ clickup docs edit-page <doc_id> <page_id> --content "New section" --append
 clickup spaces list
 clickup folders list --space <space>
 clickup lists list --folder <folder_id>
+clickup spaces list --include-archived  # also on folders list / lists list
 clickup spaces statuses <space>
 ```
 

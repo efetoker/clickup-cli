@@ -88,6 +88,21 @@ def resolve_space_id(space_arg, spaces=None):
     return space_arg
 
 
+def list_with_archived(client, path, key, include_archived=False):
+    """GET a v2 collection, optionally merging the archived pass.
+
+    ClickUp treats `archived=true` as archived-only, so a second call is
+    merged into the active results and deduplicated by ID.
+    """
+    items = client.get_v2(path).get(key, [])
+    if include_archived:
+        deduped = {}
+        for item in items + client.get_v2(path, params={"archived": "true"}).get(key, []):
+            deduped.setdefault(item["id"], item)
+        items = list(deduped.values())
+    return {key: items, "count": len(items)}
+
+
 def fetch_all_comments(client, task_id, all_pages=False):
     """Fetch task comments with a bounded default and explicit exhaustive mode."""
     first_page = client.get_v2(f"/task/{task_id}/comment", params=None)

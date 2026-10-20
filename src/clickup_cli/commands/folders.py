@@ -1,6 +1,6 @@
 """Folder command handlers — list, get, create, update, delete, privacy."""
 
-from ..helpers import add_id_argument, error, resolve_space_id
+from ..helpers import add_id_argument, error, list_with_archived, resolve_space_id
 from .backup import (
     backup_list,
     backup_options,
@@ -54,15 +54,20 @@ examples:
         description="""\
 List all folders in a space. Returns folder names, IDs, and metadata.
 
+Archived folders are hidden unless --include-archived is set.
+
 Use this to discover folder IDs before creating lists inside them
 or to see the organizational structure of a space.""",
         epilog="""\
 returns:
   {"folders": [...], "count": N}
 
+  Each folder has an "archived" boolean.
+
 examples:
   clickup folders list --space <name>
   clickup folders list --space 901810200000
+  clickup folders list --space <name> --include-archived
   clickup --pretty folders list --space <name>""",
     )
     fl.add_argument(
@@ -71,6 +76,12 @@ examples:
         required=True,
         type=str,
         help="Space name (from config) or raw ClickUp space ID",
+    )
+    fl.add_argument(
+        "--include-archived",
+        action="store_true",
+        dest="include_archived",
+        help="Include archived folders (makes a second API call and merges results)",
     )
 
     # folders get
@@ -248,9 +259,12 @@ notes:
 def cmd_folders_list(client, args):
     """List all folders in a space."""
     space_id = resolve_space_id(args.space)
-    resp = client.get_v2(f"/space/{space_id}/folder")
-    folders = resp.get("folders", [])
-    return {"folders": folders, "count": len(folders)}
+    return list_with_archived(
+        client,
+        f"/space/{space_id}/folder",
+        "folders",
+        include_archived=getattr(args, "include_archived", False),
+    )
 
 
 def cmd_folders_get(client, args):
