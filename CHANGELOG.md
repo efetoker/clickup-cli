@@ -1,10 +1,18 @@
 # Changelog
 
-## 1.9.0 (2026-09-18)
+## 1.9.0 (2026-10-20)
 
 - **Task archiving is now a first-class write operation.** `tasks update --archive` / `--unarchive` send `archived: true|false` inside the existing core-field PUT body (no extra request), the two flags are mutually exclusive, and either one is a complete update on its own — no other mutable flag is required.
 - **New `tasks bulk archive` command.** Archive or restore many tasks from repeated `--task-id` values and/or a newline-delimited `--task-file`, with `--unarchive` for the reverse direction. It follows the existing bulk contract: `--dry-run` returns a structural plan with zero API calls, live runs stop on the first failure unless `--continue-on-error` is set, and failures come back with `failed`, `remaining`, and `resume_from` details.
 - **`tasks create` can now create real subtasks.** A new `--parent <task_id>` flag (alias `--parent-id`) sets the API `parent` field so the new task is created as a subtask of an existing task in the same list. `--dry-run` shows the `parent` linkage in the request body.
+- **Space tags can be renamed, recolored and migrated.** `tags edit` renames or recolors a space tag (`--name`, `--fg-color`, `--bg-color`). `tags migrate --map <file.json>` merges, renames or drops tags across every task in the space, closed and archived tasks included. It validates the map before any change, `--dry-run` returns the full plan, `--delete-old` removes source tags once nothing uses them, and failures report `completed`, `failed`, `remaining` and `resume_from`.
+- **Strict tag checks.** `--strict-tags` rejects tags that do not exist in the space before any mutation, dry-run included, on `tasks create`, `tasks update`, `tasks bulk tags` and `tags add`. The `strict_tags` config key sets the default (off), and `--no-strict-tags` overrides it.
+- **`tags usage` can audit every tag at once.** Without `--tag` it returns a usage count for every tag in the space, zero-usage tags included. The space can now be passed positionally: `clickup tags usage <space>`.
+- **New filters on `tasks list` and `tasks search`.** `--untagged`, repeatable `--exclude-tag`, `--due-before`, `--due-after` and `--overdue` (dates use the system-local timezone), plus `--limit` to cap the number of returned tasks. Filters apply before `--limit`.
+- **`fields list` covers more scopes.** `--space-level` (with `--space`), `--folder <id>` and `--workspace` read fields defined at those levels. The existing `--space` behavior is unchanged.
+- **`--include-archived` on `spaces list`, `folders list` and `lists list`.** Archived items are fetched with a second request and merged by ID.
+- **`tasks update --clear-priority`** removes a task's priority. It cannot be combined with `--priority`.
+- **Fixed: `tasks search "<text>"` now filters by the query text**; before, the text was ignored. Bulk tag operations also return structured failure output on API errors instead of exiting.
 
 ## 1.8.0 (2026-04-26)
 
