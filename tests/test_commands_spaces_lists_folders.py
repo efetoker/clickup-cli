@@ -39,6 +39,14 @@ from clickup_cli.commands.spaces import (
 )
 
 
+def _by_archived(key, active, archived):
+    """Fake response that mimics ClickUp's archived-only `archived=true` pass."""
+    def respond(path, kwargs):
+        params = kwargs.get("params") or {}
+        return {key: archived if params.get("archived") == "true" else active}
+    return respond
+
+
 class FoldersListTests(unittest.TestCase):
 
     def test_list_folders(self):
@@ -48,6 +56,17 @@ class FoldersListTests(unittest.TestCase):
         args = Namespace(space="testspace")
         result = cmd_folders_list(client, args)
         self.assertEqual(result["count"], 2)
+
+    def test_list_include_archived_merges(self):
+        client = FlexClient(responses={"/folder": _by_archived(
+            "folders", active=[{"id": "f1"}], archived=[{"id": "f2"}]
+        )})
+
+        result = cmd_folders_list(client, Namespace(space="testspace", include_archived=True))
+
+        self.assertEqual([f["id"] for f in result["folders"]], ["f1", "f2"])
+        self.assertIn("/space/111/folder", client.calls[1]["path"])
+        self.assertEqual(client.calls[1]["params"], {"archived": "true"})
 
 
 class FoldersGetTests(unittest.TestCase):
@@ -391,6 +410,19 @@ class ListsListTests(unittest.TestCase):
         args = Namespace(folder="f1", space=None)
         result = cmd_lists_list(client, args)
         self.assertEqual(result["count"], 1)
+        self.assertEqual(len(client.calls), 1)
+
+    def test_list_include_archived_merges(self):
+        client = FlexClient(responses={"/list": _by_archived(
+            "lists", active=[{"id": "l1"}], archived=[{"id": "l2"}]
+        )})
+
+        args = Namespace(folder="f1", space=None, include_archived=True)
+        result = cmd_lists_list(client, args)
+
+        self.assertEqual([item["id"] for item in result["lists"]], ["l1", "l2"])
+        self.assertIn("/folder/f1/list", client.calls[1]["path"])
+        self.assertEqual(client.calls[1]["params"], {"archived": "true"})
         self.assertIn("/folder/f1/list", client.calls[0]["path"])
 
     def test_list_by_space(self):
@@ -620,6 +652,27 @@ class SpacesListTests(unittest.TestCase):
         cmd_spaces_list(client, Namespace())
 
         self.assertIn("/team/runtime_ws/space", client.calls[0]["path"])
+
+    def test_list_default_skips_archived_pass(self):
+        client = FlexClient(responses={"/space": {"spaces": [{"id": "s1"}]}})
+
+        cmd_spaces_list(client, Namespace(include_archived=False))
+
+        self.assertEqual(len(client.calls), 1)
+        self.assertIsNone(client.calls[0]["params"])
+
+    def test_list_include_archived_merges_and_dedupes(self):
+        client = FlexClient(responses={"/space": _by_archived(
+            "spaces",
+            active=[{"id": "s1", "archived": False}],
+            archived=[{"id": "s2", "archived": True}, {"id": "s1", "archived": False}],
+        )})
+
+        result = cmd_spaces_list(client, Namespace(include_archived=True))
+
+        self.assertEqual([s["id"] for s in result["spaces"]], ["s1", "s2"])
+        self.assertEqual(result["count"], 2)
+        self.assertEqual(client.calls[1]["params"], {"archived": "true"})
 
 
 class SpacesGetTests(unittest.TestCase):

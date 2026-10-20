@@ -1,6 +1,6 @@
 """Space command handlers — list, get, create, update, delete, privacy."""
 
-from ..helpers import add_id_argument, error, resolve_space_id
+from ..helpers import add_id_argument, error, list_with_archived, resolve_space_id
 from .privacy import handle_privacy_request, register_privacy_subcommand
 
 DEFAULT_SPACE_FEATURES = {
@@ -103,7 +103,7 @@ notes:
     spaces_sub = spaces_parser.add_subparsers(dest="command", required=True)
 
     # spaces list
-    spaces_sub.add_parser(
+    sl = spaces_sub.add_parser(
         "list",
         formatter_class=F,
         help="List all spaces in the workspace",
@@ -111,15 +111,26 @@ notes:
 List all spaces in the workspace. Returns space names, IDs, and basic
 metadata for every space the authenticated user can access.
 
+Archived spaces are hidden unless --include-archived is set.
+
 Use this for discovery — find available spaces and their IDs without
 relying on hardcoded configuration.""",
         epilog="""\
 returns:
   {"spaces": [...], "count": N}
 
+  Each space has an "archived" boolean.
+
 examples:
   clickup spaces list
+  clickup spaces list --include-archived
   clickup --pretty spaces list""",
+    )
+    sl.add_argument(
+        "--include-archived",
+        action="store_true",
+        dest="include_archived",
+        help="Include archived spaces (makes a second API call and merges results)",
     )
 
     # spaces get
@@ -273,9 +284,12 @@ notes:
 
 def cmd_spaces_list(client, args):
     """List all spaces in the workspace."""
-    resp = client.get_v2(f"/team/{client.runtime.workspace_id}/space")
-    spaces = resp.get("spaces", [])
-    return {"spaces": spaces, "count": len(spaces)}
+    return list_with_archived(
+        client,
+        f"/team/{client.runtime.workspace_id}/space",
+        "spaces",
+        include_archived=getattr(args, "include_archived", False),
+    )
 
 
 def cmd_spaces_get(client, args):
